@@ -1,0 +1,70 @@
+function [r_eci,v_eci] = kep2cart(e, a, i, raan, nu, ap)
+% Convert Keplerian elements with inputs of 6 to r and v vectores
+
+mu = 398600.4418; %km^3/s^2
+
+p = a*(1-e^2);
+
+r = (p)/(1 + e*cos(nu));
+
+r_pqw = [r*cos(nu); r*sin(nu); 0];
+
+v_pqw = sqrt(mu/p) * [-sin(nu); e + cos(nu); 0];
+
+% Now convert from pqw to ECI frame with rotation matrix
+% Q = rot(raan) * rot(i) * rot(ap);
+
+cO = cos(raan); sO = sin(raan);
+ci = cos(i);  si = sin(i);
+co = cos(ap); so = sin(ap);
+
+% Combined rotation Q = R3(Ω) * R1(i) * R3(ω), expanded
+Q = [ cO*co - sO*so*ci,   cO*so + sO*co*ci,   sO*si;
+     -sO*co - cO*so*ci,  -sO*so + cO*co*ci,   cO*si;
+      so*si,            -co*si,              ci     ];
+
+% Transform to ECI
+r_eci = Q * r_pqw;
+v_eci = Q * v_pqw;
+
+end
+
+%function [e, a, i, raan, nu , ap] = cart2kep(r_eci, v_eci)
+function [e, a, i, raan] = cart2kep(r_eci, v_eci)
+%Convert Cartesian coordinated to keplarian elements
+
+mu = 398600.4418; %km^3/s^2
+
+% Calculate the specific angular momentum vector
+h = cross(r_eci, v_eci);
+
+h_norm = norm(h);
+
+%inclination calculation
+
+i = acos(h(3)/h_norm);
+
+i = rad2deg(i);
+
+n = cross([0;0;1], h);
+
+rmag = norm(r_eci);
+vmag = norm(v_eci);
+
+e = ((vmag^2 - mu/rmag)*r_eci) - (dot(r_eci,v_eci)*v_eci);
+e = e/mu;
+e = norm(e);
+
+o_energy = (vmag^2/2) - (mu/rmag);
+a = -(mu)/(2*o_energy);
+
+raan = atan2(n(2), n(1));
+raan = rad2deg(raan);
+end
+
+
+
+
+[r, v] = kep2cart(0.9, 700, deg2rad(51.6), deg2rad(40), deg2rad(30), deg2rad(80))
+
+[e,a,i, raan] = cart2kep(r, v)
