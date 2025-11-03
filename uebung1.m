@@ -19,9 +19,9 @@ ci = cos(i);  si = sin(i);
 co = cos(ap); so = sin(ap);
 
 % Combined rotation Q = R3(Ω) * R1(i) * R3(ω), expanded
-Q = [ cO*co - sO*so*ci,   cO*so + sO*co*ci,   sO*si;
-     -sO*co - cO*so*ci,  -sO*so + cO*co*ci,   cO*si;
-      so*si,            -co*si,              ci     ];
+Q = [ cO*co - sO*so*ci,   -cO*so - sO*co*ci,   sO*si;
+      sO*co + cO*so*ci,   -sO*so + cO*co*ci,  -cO*si;
+      so*si,               co*si,             ci     ];
 
 % Transform to ECI
 r_eci = Q * r_pqw;
@@ -29,8 +29,12 @@ v_eci = Q * v_pqw;
 
 end
 
+
+
+
 %function [e, a, i, raan, nu , ap] = cart2kep(r_eci, v_eci)
-function [e, a, i, raan] = cart2kep(r_eci, v_eci)
+
+function [e, a, i, raan, nu, argp] = cart2kep(r_eci, v_eci)
 %Convert Cartesian coordinated to keplarian elements
 
 mu = 398600.4418; %km^3/s^2
@@ -60,6 +64,18 @@ a = -(mu)/(2*o_energy);
 
 raan = atan2(n(2), n(1));
 raan = rad2deg(raan);
+
+e_vec = ((vmag^2 - mu/rmag)*r_eci) - (dot(r_eci,v_eci)*v_eci);
+e_vec = e_vec/mu;
+
+n_norm = norm(n);
+
+argp = atan2( dot(cross(n, e_vec), h)/(n_norm*e*h_norm), dot(n, e_vec)/(n_norm*e) );
+nu   = atan2( dot(cross(e_vec, r_eci), h)/(e*h_norm*rmag), dot(e_vec, r_eci)/(e*rmag) );
+
+% Convert to degrees
+argp = rad2deg(argp);
+nu   = rad2deg(nu);
 end
 
 
@@ -67,4 +83,4 @@ end
 
 [r, v] = kep2cart(0.9, 700, deg2rad(51.6), deg2rad(40), deg2rad(30), deg2rad(80))
 
-[e,a,i, raan] = cart2kep(r, v)
+[e, a, i, raan, nu, argp] = cart2kep(r, v)
