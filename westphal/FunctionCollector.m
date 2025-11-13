@@ -120,7 +120,7 @@ classdef FunctionCollector
 
             % sets tolerance (defaults to 10⁻¹⁰)
             if (nargin < 4) || isempty(opts) || ~isfield(opts,'tol')
-                tol = 1e-4;
+                tol = 1e-12;
             else
                 tol = opts.tol;
             end
@@ -382,8 +382,8 @@ classdef FunctionCollector
 
             [tt, R, V] = obj.perform_rk4_2nd_ODE(f, g, t0, rr0, vv0, t1, t_step);
 
-            end
-                
         end
+                
+    end
 
 end
