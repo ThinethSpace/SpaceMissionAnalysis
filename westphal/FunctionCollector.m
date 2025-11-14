@@ -244,7 +244,7 @@ classdef FunctionCollector
         end
     end
     methods
-        function [nu1, OM1, rr, vv] = propagate_orbit_increment_keplar_newton(obj, a, e, i, Omega0, omega, nu0, mu , t0, t1, R_E, J_2)
+        function [nu1, OM1, rr, vv] = propagate_orbit_increment_keplar_newton(obj, a, e, i, Omega0, omega0, nu0, mu , t0, t1, R_E, J_2)
 
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
@@ -295,7 +295,12 @@ classdef FunctionCollector
         
             OM_dot = (-3/2) * sqrt(mu/(a^3)) * J_2 * (R_E / a)^2 * (cos(i)/(1-e^2)^2);
             OM1 = Omega0 + OM_dot * (t1 - t0);
-            [rr, vv] = obj.convert_kep2car(a, e, i, OM1, omega, nu1, mu);
+
+            om_dot = (3/4)*J_2*n * (R_E/a)^2 * (5*(cos(i)^2) - 1) / (1 - e^2)^2;
+
+            om1 = omega0 + om_dot * (t0 - t1);
+
+            [rr, vv] = obj.convert_kep2car(a, e, i, OM1, om1, nu1, mu);
         
         
                 
