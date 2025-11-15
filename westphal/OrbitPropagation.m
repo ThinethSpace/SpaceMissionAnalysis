@@ -1,4 +1,4 @@
-classdef FunctionCollector
+classdef OrbitPropagation
     %FUNCTIONS Summary of this class goes here
     %   Detailed explanation goes here
     methods (Static)
@@ -45,15 +45,9 @@ classdef FunctionCollector
         function [lat_deg, lon_deg] = convert_eci2lla(R_eci, tt, we, theta_g0)
             %%%%%%%Author: Kolja Westphal, TUB 2025, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
-            %%%% Input 
-            
-            % a [nx3] Matrix of position vectors [km]
-            % tt [nx1] array of times of pos
+            %%%% Input
             
             %%%% Output
-            
-            % rr [3x1] position vector [km]
-            % vv [3x1] velocity vector [km/s]
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -253,16 +247,21 @@ classdef FunctionCollector
             % a [1x1] semi-major axis [km]
             % e [1x1] eccentricity [-]
             % i [1x1] inclination [rad]
-            % OM [1x1] RAAN [rad]
-            % om [1x1] argument of periapsis [rad]
-            % nu [1x1] true anomaly [rad]
+            % Omega0 [1x1] RAAN [rad]
+            % omega0 [1x1] argument of periapsis [rad]
+            % nu0 [1x1] true anomaly [rad]
             % mu [1x1] gravitational parameter [km^3/s^2]
-            % t0 [1x1] initial time
-            % t [1x1] time of progation
+            % t0 [1x1] initial time [s]
+            % t1 [1x1] time of progation [s]
+            % R_E [1x1] body's equatorial radius [km]
+            % J_2 [1x1] body's second dynamic form factor [-]
             
             %%%% Output
             
-            % nu [1x1] 
+            % nu1 [1x1] propagated true anomaly
+            % OM1 [1x1] propagated RAAN with J_2
+            % rr [3x1] propagated position vector
+            % vv [3x1] propagated velocity vector
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
     
@@ -315,16 +314,22 @@ classdef FunctionCollector
             % a [1x1] semi-major axis [km]
             % e [1x1] eccentricity [-]
             % i [1x1] inclination [rad]
-            % OM [1x1] RAAN [rad]
-            % om [1x1] argument of periapsis [rad]
-            % nu [1x1] true anomaly [rad]
+            % Omega0 [1x1] RAAN [rad]
+            % omega0 [1x1] argument of periapsis [rad]
+            % nu0 [1x1] true anomaly [rad]
             % mu [1x1] gravitational parameter [km^3/s^2]
-            % t0 [1x1] initial time
-            % t [1x1] time of progation
-            
+            % t0 [1x1] initial time [s]
+            % t1 [1x1] time of progation [s]
+            % t_step [1x1] time step of propagation [s]
+            % R_E [1x1] body's equatorial radius [km]
+            % J_2 [1x1] body's second dynamic form factor [-]
+
             %%%% Output
             
-            % nu [1x1] 
+            % tt [nx1] time array [s]
+            % R [nx3] matrix of position vectors [km]
+            % V [nx3] matrix of velcoty vecotrs [km]
+
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
                 
@@ -367,11 +372,17 @@ classdef FunctionCollector
             % rr0 [3x1] initial position vector [km]
             % vv0 [3x1] inital velocity vector [km/s]
             % t0 [1x1] initial time
-            % t [1x1] time of progation
+            % t1 [1x1] time of progation
+            % t_step [1x1] time step of propagation [s]
+            % mu [1x1] gravitational parameter [km^3/s^2]
+            % R_E [1x1] body's equatorial radius [km]
+            % J_2 [1x1] body's second dynamic form factor [-]
             
             %%%% Output
             
-            % nu [1x1] 
+            % tt [nx1] time array [s]
+            % R [nx3] matrix of position vectors [km]
+            % V [nx3] matrix of velcoty vecotrs [km] 
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
                 
@@ -389,6 +400,58 @@ classdef FunctionCollector
 
         end
                 
+        function [vv_1, vv_2] = solve_lamperts_problem_gauss(rr_1, rr_2)
+
+            % Init arrays
+
+            vv_1 = zeros(3);
+            vv_2 = zeros(3);
+
+            % check if angle between the two vectors exceeds 90°
+            if (dot(rr_1, rr_2) < 0)
+                return;
+            end
+            
+            % Define l and m
+            delta_Omega = acos(dot(rr_1, rr_2) / ((norm(rr_1) * norm(rr_2))));
+            l = (norm(rr_1) + norm(rr_2)) / (4*sqrt(rr_1*rr_2) * cos(delta_Omega/2));
+            m = (mu*(t_2 - t-1)^2) / (4*sqrt(rr_1*rr_2) * cos(delta_Omega/2))^3;
+
+            % Loop to determine y
+            % Initial guess for y
+            y0 = 1;
+            
+            max_iter = 200;
+            tol = 1E-12;
+
+            for k = 1:max_iter
+                x_1 = m / y0^2;
+                
+                % Determine x_2
+                term = 1;
+                x_2 = term;
+                nTerms = 4; %number of terms in the series
+                for i=2:nTerms
+                    j=2*i+1;
+                    term=term*x_1*(j+1)/j;
+                    x_2=x_2+term;
+                end
+
+                % Solve for y
+                y1 = 1 + x_2*(l + x_1);
+                
+                % Break 
+                if (abs(y1-y0) < tol)
+                    return
+                else
+                    y0 = y1;
+                end
+            end
+
+
+
+
+        end
     end
 
 end
