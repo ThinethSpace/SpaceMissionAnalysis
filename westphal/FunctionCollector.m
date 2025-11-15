@@ -298,7 +298,7 @@ classdef FunctionCollector
 
             om_dot = (3/4)*J_2*n * (R_E/a)^2 * (5*(cos(i)^2) - 1) / (1 - e^2)^2;
 
-            om1 = omega0 + om_dot * (t0 - t1);
+            om1 = omega0 + om_dot * (t1 - t0);
 
             [rr, vv] = obj.convert_kep2car(a, e, i, OM1, om1, nu1, mu);
         
