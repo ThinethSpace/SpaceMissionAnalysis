@@ -400,58 +400,6 @@ classdef OrbitPropagation
 
         end
                 
-        function [vv_1, vv_2] = solve_lamperts_problem_gauss(rr_1, rr_2)
-
-            % Init arrays
-
-            vv_1 = zeros(3);
-            vv_2 = zeros(3);
-
-            % check if angle between the two vectors exceeds 90°
-            if (dot(rr_1, rr_2) < 0)
-                return;
-            end
-            
-            % Define l and m
-            delta_Omega = acos(dot(rr_1, rr_2) / ((norm(rr_1) * norm(rr_2))));
-            l = (norm(rr_1) + norm(rr_2)) / (4*sqrt(rr_1*rr_2) * cos(delta_Omega/2));
-            m = (mu*(t_2 - t-1)^2) / (4*sqrt(rr_1*rr_2) * cos(delta_Omega/2))^3;
-
-            % Loop to determine y
-            % Initial guess for y
-            y0 = 1;
-            
-            max_iter = 200;
-            tol = 1E-12;
-
-            for k = 1:max_iter
-                x_1 = m / y0^2;
-                
-                % Determine x_2
-                term = 1;
-                x_2 = term;
-                nTerms = 4; %number of terms in the series
-                for i=2:nTerms
-                    j=2*i+1;
-                    term=term*x_1*(j+1)/j;
-                    x_2=x_2+term;
-                end
-
-                % Solve for y
-                y1 = 1 + x_2*(l + x_1);
-                
-                % Break 
-                if (abs(y1-y0) < tol)
-                    return
-                else
-                    y0 = y1;
-                end
-            end
-
-
-
-
-        end
     end
 
 end
