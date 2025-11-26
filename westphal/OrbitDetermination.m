@@ -31,8 +31,8 @@ classdef OrbitDetermination
             end
             % Init arrays
 
-            vv_1 = zeros(3);
-            vv_2 = zeros(3);
+            vv_1 = zeros(3,1);
+            vv_2 = zeros(3,1);
 
             % Calculate norm of vectors 
             n_rr_1 = norm(rr_1);
@@ -91,7 +91,7 @@ classdef OrbitDetermination
             vv_2 = (g_dash*rr_2 - rr_1) / g;
         end
         
-        function [vv_1, vv_2, vv_3] = solve_gibbs_method(rr_1, rr_2, rr_3, min_angle_coplanar, min_angle_separation)
+        function [vv_1, vv_2, vv_3] = solve_gibbs_method(rr_1, rr_2, rr_3, mu, min_angle_coplanar, min_angle_separation)
             
             %%%%%%%Author: Kolja Westphal, TUB 2025, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
@@ -100,6 +100,7 @@ classdef OrbitDetermination
             % rr_1 [3x1] position vector 1 [km]
             % rr_2 [3x1] position vector 2 [km]
             % rr_2 [3x1] position vector 3 [km]
+            % mu [1x1] gravitational parameter [km^3/s^2] 
             % Optional:
             % min_angle_coplanar [1x] min angle between vectors to check for coplanarity[deg]
             % min_angle_separation [1x] min angle between vectors in plane [deg]
@@ -114,7 +115,7 @@ classdef OrbitDetermination
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             arguments
-                rr_1, rr_2, rr_3,
+                rr_1, rr_2, rr_3, mu,
                 min_angle_coplanar = 5;
                 min_angle_separation = 1;
 
@@ -127,10 +128,10 @@ classdef OrbitDetermination
             n_rr_1 = norm(rr_1); n_rr_2 = norm(rr_2); n_rr_3 = norm(rr_3);
 
             % Check coplanarity
-            alpha_cop = asin( dot(zz_23, rr_1) / (n_z23 * n_rr_1) );
+            alpha_cop = asin( dot(zz_23, rr_1) / (norm(zz_23) * n_rr_1) );
 
             if rad2deg(alpha_cop) > min_angle_coplanar
-                error("Vectors coplanarity angle exceeds " + min_angle_separation + " degrees");
+                error("Vectors coplanarity angle exceeds " + min_angle_coplanar + " degrees");
             end
             
             % Check angle difference between vectors
@@ -142,9 +143,9 @@ classdef OrbitDetermination
             end
 
             % Calculate vectors n, d and s
-            nn = n_rr_1*zz_23 + rr_2*zz_31 + rr_3*zz_12;
+            nn = n_rr_1*zz_23 + n_rr_2*zz_31 + n_rr_3*zz_12;
             dd = zz_23 + zz_31 + zz_12;
-            ss = (rr_2 - rr_3)*rr_1 + (rr_3 - rr_1)*rr_2 + (rr_1 - rr_2)*rr_3;
+            ss = (n_rr_2 - n_rr_3)*rr_1 + (n_rr_3 - n_rr_1)*rr_2 + (n_rr_1 - n_rr_2)*rr_3;
 
             B = cross([dd,dd,dd], [rr_1,rr_2,rr_3]);
 
@@ -156,7 +157,7 @@ classdef OrbitDetermination
             vv_3 = V(:,3);
 
         end
-        function [vv_2] = solve_gibbs_herrik_method(rr_1, rr_2, rr_3,tt, min_angle_coplanar, min_angle_separation)
+        function [vv_2] = solve_gibbs_herrik_method(rr_1, rr_2, rr_3,tt, mu, min_angle_coplanar, min_angle_separation)
             
             %%%%%%%Author: Kolja Westphal, TUB 2025, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
@@ -178,7 +179,7 @@ classdef OrbitDetermination
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             arguments
-                rr_1, rr_2, rr_3,tt,
+                rr_1, rr_2, rr_3,tt, mu,
                 min_angle_coplanar = 5;
                 min_angle_separation = 5;
             end
@@ -200,7 +201,7 @@ classdef OrbitDetermination
             a12 = acos(dot(rr_1, rr_2) / (n_rr_1 * n_rr_2));
             a23 = acos(dot(rr_2, rr_3) / (n_rr_2 * n_rr_3));
             
-            if (rad2deg(a12) > min_angle_separation) || (rad2deg(a23) > min_angle_separation)
+            if (rad2deg(a12) < min_angle_separation) || (rad2deg(a23) < min_angle_separation)
                 error("Angle between vectors is higher than " + min_angle_separation + " degrees");
             end
 
@@ -237,7 +238,7 @@ classdef OrbitDetermination
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             % Calculate intermediate matrix
-            M = inv(LOS)\R_GS;
+            M = LOS \ R_GS;
 
             % Form coefficients
             tau_1 = tt(1) - tt(2);
@@ -245,7 +246,7 @@ classdef OrbitDetermination
             a_1 = tau_3 / (tau_3 - tau_1);
             a_1u = (tau_3*((tau_3 - tau_1)^2) - tau_3^2) / (6*(tau_3 - tau_1));
             a_3 = -1 * tau_1 / (tau_3 - tau_1);
-            a_3u = -1 * (tau_1*(tau_3 * tau_1)^2 - tau_1^2) / (6*(tau_2 - tau_1));
+            a_3u = -1 * (tau_1*(tau_3 * tau_1)^2 - tau_1^2) / (6*(tau_3 - tau_1));
 
             % Calculate d_1 and d_2 and C
             d_1 = M(2,1)*a_1 - M(2,2) + M(2,3)*a_3;
@@ -261,7 +262,7 @@ classdef OrbitDetermination
             rts = roots(poly);
 
             % Check for complex roots
-            if any(imag(r) ~= 0)
+            if any(imag(rts) ~= 0)
                 error("Polynomial has complex roots");
             end
     
@@ -283,7 +284,7 @@ classdef OrbitDetermination
     end
     methods
         
-        function [R, vv_2] = solve_anlges_only_approach_extended(obj, LOS, R_GS, tt, mu, tol, max_iterations)
+        function [R, vv_2] = solve_angles_only_approach_extended(obj, LOS, R_GS, tt, mu, tol, max_iterations)
             %%%%%%%Author: Kolja Westphal, TUB 2025, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input 
@@ -306,21 +307,24 @@ classdef OrbitDetermination
             % Solve angles only approach for first guess of roh -> R
             R = obj.solve_angles_only_approach(LOS, R_GS, tt, mu);
 
+            % Get M for loop
+            M = LOS \ R_GS;
+
             % Init empty slant range vector
             rhorho = zeros(3,1);
 
             % Start the loop
             n = 1;
-            while n <= max_iteratinos
+            while n <= max_iterations
 
                 % Check angles between vectors
                 a12 = acos(dot(R(:,1), R(:,2)) / (norm(R(:,1)) * norm(R(:,2))));
                 a23 = acos(dot(R(:,2), R(:,3)) / (norm(R(:,2)) * norm(R(:,3))));
                 
                 if (rad2deg(a12) > 3) && (rad2deg(a23) > 3)
-                   [~, vv_2, ~] = obj.solve_gibbs_method(R(:,1), R(:,2), R(:,3));
+                   [~, vv_2, ~] = obj.solve_gibbs_method(R(:,1), R(:,2), R(:,3), mu);
                 elseif (rad2deg(a12) < 3) && (rad2deg(a23) < 3)
-                    vv_2 = obj.solve_gibbs_herrik_method(R(:,1), R(:,2), R(:,3));
+                    vv_2 = obj.solve_gibbs_herrik_method(R(:,1), R(:,2), R(:,3), tt, mu);
                 else
                     error('No method could be applied to solve for v_2')
                 end
@@ -342,7 +346,7 @@ classdef OrbitDetermination
                 cc = [c_1;c_2;c_3];
                 rhorho_new = dot(M, -1*cc) ./ cc;
 
-                R = LOS .* rohroh' + R_GS;
+                R = LOS .* rhorho_new' + R_GS;
 
                 % Check if the change in the slat ranges is almost zero
                 if norm(rhorho - rhorho_new) < tol
