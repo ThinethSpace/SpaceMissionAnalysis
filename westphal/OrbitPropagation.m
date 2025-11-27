@@ -42,6 +42,40 @@ classdef OrbitPropagation
         
         end
         
+        function [a, e, i, RAAN, omega, nu] = convert_car2kep(rr, vv, mu)
+            rnorm = norm(rr);
+            vnorm = norm(vv);
+
+            h = cross(rr, vv);
+            hnorm = norm(h);
+
+            kvec = [0; 0; 1];
+            i = acos(h(3) / hnorm);
+
+            n = cross(kvec, h);
+            nnorm = norm(n);
+
+            evec = (1/mu) * ( (vnorm^2 - mu/rnorm) * rr - dot(rr, vv) * vv );
+            e = norm(evec);
+
+            RAAN = acos(n(1) / nnorm);
+            if n(2) < 0
+                RAAN = 2*pi - RAAN;
+            end
+
+            omega = acos(dot(n, evec) / (nnorm * e));
+            if evec(3) < 0
+                omega = 2*pi - omega;
+            end
+
+            nu = acos(dot(evec, rr) / (e * rnorm));
+            if dot(rr, vv) < 0
+                nu = 2*pi - nu;
+            end
+
+            a = 1 / (2/rnorm - vnorm^2/mu);
+        end
+        
         function [lat_deg, lon_deg] = convert_eci2lla(R_eci, tt, we, theta_g0)
             %%%%%%%Author: Kolja Westphal, TUB 2025, ALL RIGHTS RESERVED%%%%%%%%%%%%
             

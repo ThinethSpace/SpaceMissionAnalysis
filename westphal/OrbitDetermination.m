@@ -26,7 +26,7 @@ classdef OrbitDetermination
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             arguments
                 rr_1, rr_2, t_1, t_2, mu;
-                max_iterations = 200;
+                max_iterations = 1000;
                 tolerance = 1E-12;
             end
             % Init arrays
@@ -53,7 +53,7 @@ classdef OrbitDetermination
             y0 = 1;
 
             for k = 1:max_iterations
-                x_1 = m / y0^2;
+                x_1 = m / y0^2 - l;
                 
                 % Determine x_2
                 term = 1;
@@ -64,6 +64,7 @@ classdef OrbitDetermination
                     term=term*x_1*(j+1)/j;
                     x_2=x_2+term;
                 end
+                x_2 = (4/3) * x_2;
 
                 % Solve for y
                 y1 = 1 + x_2*(l + x_1);
@@ -75,6 +76,9 @@ classdef OrbitDetermination
                     y0 = y1;
                 end
             end
+
+            % solve again for x_1 with best y
+            x_1 = m / y1^2 - l;
 
             % solve f, g and g'
             p = (n_rr_1 * n_rr_2 * (1 - cos(delta_Omega))) / ...
@@ -157,6 +161,7 @@ classdef OrbitDetermination
             vv_3 = V(:,3);
 
         end
+        
         function [vv_2] = solve_gibbs_herrik_method(rr_1, rr_2, rr_3,tt, mu, min_angle_coplanar, min_angle_separation)
             
             %%%%%%%Author: Kolja Westphal, TUB 2025, ALL RIGHTS RESERVED%%%%%%%%%%%%
@@ -191,7 +196,7 @@ classdef OrbitDetermination
             n_rr_1 = norm(rr_1); n_rr_2 = norm(rr_2); n_rr_3 = norm(rr_3);
 
             % Check coplanarity
-            alpha_cop = asin( dot(zz_23, rr_1) / (n_z23 * n_rr_1) );
+            alpha_cop = asin( dot(zz_23, rr_1) / (norm(zz_23) * n_rr_1) );
 
             if rad2deg(alpha_cop) > min_angle_coplanar
                 error("Vectors coplanarity angle exceeds " + min_angle_separation + " degrees");
@@ -201,7 +206,7 @@ classdef OrbitDetermination
             a12 = acos(dot(rr_1, rr_2) / (n_rr_1 * n_rr_2));
             a23 = acos(dot(rr_2, rr_3) / (n_rr_2 * n_rr_3));
             
-            if (rad2deg(a12) < min_angle_separation) || (rad2deg(a23) < min_angle_separation)
+            if (rad2deg(a12) > min_angle_separation) || (rad2deg(a23) > min_angle_separation)
                 error("Angle between vectors is higher than " + min_angle_separation + " degrees");
             end
 
@@ -246,7 +251,7 @@ classdef OrbitDetermination
             a_1 = tau_3 / (tau_3 - tau_1);
             a_1u = (tau_3*((tau_3 - tau_1)^2) - tau_3^2) / (6*(tau_3 - tau_1));
             a_3 = -1 * tau_1 / (tau_3 - tau_1);
-            a_3u = -1 * (tau_1*(tau_3 * tau_1)^2 - tau_1^2) / (6*(tau_3 - tau_1));
+            a_3u = -1 * (tau_1*((tau_3 * tau_1)^2 - tau_1^2)) / (6*(tau_3 - tau_1));
 
             % Calculate d_1 and d_2 and C
             d_1 = M(2,1)*a_1 - M(2,2) + M(2,3)*a_3;
@@ -261,10 +266,8 @@ classdef OrbitDetermination
 
             rts = roots(poly);
 
-            % Check for complex roots
-            if any(imag(rts) ~= 0)
-                error("Polynomial has complex roots");
-            end
+            % Check for complex roots and return only real roots
+            rts = rts(imag(rts) == 0);
     
             % Calculate coefficients
             u = mu/(max(rts)^3);
@@ -274,7 +277,7 @@ classdef OrbitDetermination
 
             % Determine slat ranges
             cc = [c_1;c_2;c_3];
-            rhorho = dot(M, -1*cc) ./ cc;
+            rhorho = M * (-1*cc) ./ cc;
 
             % Determine the position vectors
             R = LOS .* rhorho' + R_GS;
@@ -329,7 +332,7 @@ classdef OrbitDetermination
                     error('No method could be applied to solve for v_2')
                 end
                 
-                u_dot = -1*mu*(R(:,2) * vv_2 / norm(R(:,2))) / norm(R(:,2))^4;
+                u_dot = -1*3*mu*(dot(R(:,2),vv_2) / norm(R(:,2))) / norm(R(:,2))^4;
                 tau_1 = tt(1) - tt(2);
                 tau_3 = tt(3) - tt(2);
                 u = mu/(norm(R(:,2))^3);
@@ -344,7 +347,7 @@ classdef OrbitDetermination
                 c_3 = +1*g(tau_1) / (f(tau_1)*g(tau_3) - f(tau_3)*g(tau_1));
 
                 cc = [c_1;c_2;c_3];
-                rhorho_new = dot(M, -1*cc) ./ cc;
+                rhorho_new = M * (-1*cc) ./ cc;
 
                 R = LOS .* rhorho_new' + R_GS;
 
