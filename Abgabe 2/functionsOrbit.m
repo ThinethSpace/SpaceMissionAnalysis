@@ -188,13 +188,94 @@ classdef functionsOrbit
             r2n = norm(r2);
             r3n = norm(r3);
 
-            % Koeffizienten nach Herrick-Gibbs (vgl. Vallado / Orekit) :contentReference[oaicite:0]{index=0}
+            % Koeffizienten nach Herrick-Gibbs (vgl. Vallado / Orekit) 
             c1 = -tau32 * (1/(tau21 * tau31) + muOTwelve / (r1n^3));
             c2 = (tau32 - tau21) * (1/(tau21 * tau32) + muOTwelve / (r2n^3));
             c3 =  tau21 * (1/(tau32 * tau31) + muOTwelve / (r3n^3));
 
             % v2 als Linearkombination der Positionsvektoren
             v2 = c1 * r1 + c2 * r2 + c3 * r3;
+        end
+
+        %% ==================== TASK 4: Angles-Only Gauss ===================
+        function [r1, r2, r3, rho1, rho2, rho3, r2mag] = gaussAnglesOnly( ...
+                R1, R2, R3, rhohat1, rhohat2, rhohat3, t1, t2, t3, mu)
+            % Gauss' Angles-Only Methode (Positionen r1,r2,r3 im ECI)
+            %
+            % Eingaben:
+            %   R1,R2,R3   : Beobachter-Positionen im ECI [3x1] [km]
+            %   rhohat1..3 : LOS-Einheitsvektoren (aus RA,Dec) [3x1]
+            %   t1,t2,t3   : Beobachtungszeiten [s]
+            %   mu         : Gravitationsparameter [km^3/s^2]
+            %
+            % Ausgaben:
+            %   r1,r2,r3   : Satelliten-Positionsvektoren im ECI [3x1] [km]
+            %   rho1..3    : Topozentrische Distanzen [km]
+            %   r2mag      : |r2|
+
+            % --- Schritt 1: Zeitabstände ---
+            tau1 = t1 - t2;
+            tau3 = t3 - t2;
+            tau  = t3 - t1;
+
+            % --- Schritt 2: Kreuzprodukte der LOS-Vektoren (p1,p2,p3) ---
+            p1 = cross(rhohat2, rhohat3);
+            p2 = cross(rhohat1, rhohat3);
+            p3 = cross(rhohat1, rhohat2);
+
+            % --- Schritt 3: D0 (Skalar-Tripelprodukt) ---
+            D0 = dot(rhohat1, p1);
+
+            % --- Schritt 4: D_ij-Skalare ---
+            D11 = dot(R1, p1);  D12 = dot(R1, p2);  D13 = dot(R1, p3);
+            D21 = dot(R2, p1);  D22 = dot(R2, p2);  D23 = dot(R2, p3);
+            D31 = dot(R3, p1);  D32 = dot(R3, p2);  D33 = dot(R3, p3);
+
+            % --- Schritt 5: A, B, E-Koeffizienten ---
+            A = (1 / D0) * ( -D12 * (tau3 / tau) + D22 + D32 * (tau1 / tau) );
+            B = (1 / (6 * D0)) * ( ...
+                D12 * (tau3^2 - tau^2) * (tau3 / tau) + ...
+                D32 * (tau^2 - tau1^2) * (tau1 / tau) );
+            E = dot(R2, rhohat2);
+
+            % --- Schritt 6: |R2|^2 ---
+            R2sq = dot(R2, R2);
+
+            % --- Schritt 7: Koeffizienten a,b,c des Polynoms ---
+            a = -(A^2 + 2*A*E + R2sq);
+            b = -2 * mu * B * (A + E);
+            c = -mu^2 * B^2;
+
+            % Polynom: r2^8 + a*r2^6 + b*r2^3 + c = 0
+            coeffs = [1 0 0 0 a 0 b 0 c];
+
+            r2_candidates = roots(coeffs);
+
+            % Nur positive reelle Wurzeln zulassen
+            r2_real = r2_candidates(imag(r2_candidates) == 0 & r2_candidates > 0);
+
+            % Einfache Wahl: kleinste positive reelle Wurzel
+            r2mag = min(r2_real);
+
+            % --- Schritt 9: rho1, rho2, rho3 ---
+            rho2 = A + mu * B / (r2mag^3);
+
+            rho1 = (1 / D0) * ( ...
+                ( 6 * ( D31 * (tau1 / tau3) + D21 * (tau / tau3) ) * r2mag^3 + ...
+                  mu * D31 * (tau^2 - tau1^2) * (tau1 / tau3) ) / ...
+                ( 6 * r2mag^3 + mu * (tau^2 - tau3^2) ) ...
+                - D11 );
+
+            rho3 = (1 / D0) * ( ...
+                ( 6 * ( D13 * (tau3 / tau1) - D23 * (tau / tau1) ) * r2mag^3 + ...
+                  mu * D13 * (tau^2 - tau3^2) * (tau3 / tau1) ) / ...
+                ( 6 * r2mag^3 + mu * (tau^2 - tau1^2) ) ...
+                - D33 );
+
+            % --- Schritt 10: r1, r2, r3 (ECI) ---
+            r1 = R1 + rho1 * rhohat1;
+            r2 = R2 + rho2 * rhohat2;
+            r3 = R3 + rho3 * rhohat3;
         end
     end
 end
