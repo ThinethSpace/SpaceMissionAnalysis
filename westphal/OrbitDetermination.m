@@ -249,9 +249,9 @@ classdef OrbitDetermination
             tau_1 = tt(1) - tt(2);
             tau_3 = tt(3) - tt(2);
             a_1 = tau_3 / (tau_3 - tau_1);
-            a_1u = (tau_3*((tau_3 - tau_1)^2) - tau_3^2) / (6*(tau_3 - tau_1));
+            a_1u = tau_3*(((tau_3 - tau_1)^2) - tau_3^2) / (6*(tau_3 - tau_1));
             a_3 = -1 * tau_1 / (tau_3 - tau_1);
-            a_3u = -1 * (tau_1*((tau_3 * tau_1)^2 - tau_1^2)) / (6*(tau_3 - tau_1));
+            a_3u = -1 * tau_1*((tau_3 - tau_1)^2 - tau_1^2) / (6*(tau_3 - tau_1));
 
             % Calculate d_1 and d_2 and C
             d_1 = M(2,1)*a_1 - M(2,2) + M(2,3)*a_3;
@@ -259,10 +259,7 @@ classdef OrbitDetermination
             C = dot(LOS(:,2), R_GS(:,2));
 
             % Get roots of polynomial
-            poly = [
-                1, 0, -(d_1^2 + C*d_1 + norm(R_GS(:,2))^2), 0, ...
-                0, 2*mu*(C*d_2 + d_2*d_1), 0, 0, mu^2*d_2^2
-                ];
+            poly = [-mu^2*d_2^2, 0, 0, -2*mu*(C*d_2 + d_2*d_1), 0, 0, -(d_1^2 + C*d_1 + norm(R_GS(:,2))^2), 0, 1];
 
             rts = roots(poly);
 
