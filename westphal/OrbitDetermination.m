@@ -344,7 +344,7 @@ classdef OrbitDetermination
 
                 c_1 = g(tau_3) / (f(tau_1)*g(tau_3) - f(tau_3)*g(tau_1));
                 c_2 = -1;
-                c_3 = +1*g(tau_1) / (f(tau_1)*g(tau_3) - f(tau_3)*g(tau_1));
+                c_3 = -1*g(tau_1) / (f(tau_1)*g(tau_3) - f(tau_3)*g(tau_1));
 
                 cc = [c_1;c_2;c_3];
                 rhorho_new = M * (-1*cc) ./ cc;
