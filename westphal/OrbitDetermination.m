@@ -259,7 +259,8 @@ classdef OrbitDetermination
             C = dot(LOS(:,2), R_GS(:,2));
 
             % Get roots of polynomial
-            poly = [-mu^2*d_2^2, 0, 0, -2*mu*(C*d_2 + d_2*d_1), 0, 0, -(d_1^2 + C*d_1 + norm(R_GS(:,2))^2), 0, 1];
+            %poly = [-mu^2*d_2^2, 0, 0, -2*mu*(C*d_2 + d_2*d_1), 0, 0, -(d_1^2 + 2*C*d_1 + norm(R_GS(:,2))^2), 0, 1];
+            poly = [1, 0, -(d_1^2 + 2*C*d_1 + norm(R_GS(:,2))^2), 0, 0,-2*mu*(C*d_2 + d_2*d_1), 0, 0, -mu^2*d_2^2];
 
             rts = roots(poly);
 
