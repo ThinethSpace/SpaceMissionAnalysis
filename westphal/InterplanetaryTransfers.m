@@ -104,9 +104,9 @@ classdef InterplanetaryTransfers
             end
 
             % Minimum energy solution
-            a_m = s / 2;   
+            a_m = s / 2;
             [alpha_0, beta_0] = get_alpha_0_beta_0(a_m);
-            t_m = f(a_m, alpha_0, beta_0);
+            t_m = (a_m^(3/2) / sqrt(mu)) * ((alpha_0-beta_0) - (sin(alpha_0) - sin(beta_0)));
 
             % Determine alpha and beta based on transfer differentiation
             if (delta_theta) <= pi && (dt <= t_m)
@@ -140,17 +140,10 @@ classdef InterplanetaryTransfers
             B = sqrt(mu/(4*a)) * cot(beta/2);
 
             vv_1 = (B+A) * u_c + (B-A) * u_1;
-            vv_2 = (B+A) * u_c + (B-A) * u_2;
-
-
-            
-
+            vv_2 = (B+A) * u_c - (B-A) * u_2;
 
 
         end
     end
 
-    methods
-
-    end
 end
