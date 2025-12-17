@@ -88,48 +88,56 @@ classdef InterplanetaryTransfers
             % Relevant norms
             n_rr_1 = norm(rr_1); n_rr_2 = norm(rr_2);
             
-            % Calculating chord length and semi parameter
+            % Calculating chord length and semi parameter constants
             c = sqrt(n_rr_1^2 + n_rr_2^2 - 2*n_rr_1*n_rr_2*cos(delta_theta));
             s = (n_rr_1 + n_rr_2 + c) / 2;
 
             % Get alpha and beta
-            function [alpha_0, beta_0] = get_alpha_0_beta_0(a)
-                alpha_0 = asin(sqrt(s/(2*a))) * 2;
-                beta_0 = asin(sqrt((s-c)/(2*a))) * 2;
+            function [alpha, beta] = get_alpha_beta(a)
+                alpha = asin(sqrt(s/(2*a))) * 2;
+                beta = asin(sqrt((s-c)/(2*a))) * 2;
+            end
+
+            function [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m)
+                % Determine alpha and beta based on transfer differentiation
+                if (delta_theta) <= pi && (dt <= t_m)
+                    beta = beta; alpha = alpha;
+                elseif (delta_theta) <= pi && (dt > t_m)
+                    beta = beta; alpha = 2*pi - alpha;
+                elseif (delta_theta) > pi && (dt <= t_m)
+                    beta = -1 * beta; alpha = alpha;
+                elseif (delta_theta) > pi && (dt > t_m)
+                    beta = -1 * beta; alpha = 2*pi - alpha;
+                else
+                    error("Angle between vectors and min energy transfer do not correlate. Abort")
+                end
             end
         
             % Lambert's Equation
-            function y = f(a, alpha, beta)
+            function y = f(a, dt, t_m, mu)
+                [alpha, beta] = get_alpha_beta(a);
+                [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m);
+
                 y = a^(3/2) * (alpha - beta - (sin(alpha) - sin(beta))) - sqrt(mu) * dt;
             end
 
             % Minimum energy solution
             a_m = s / 2;
-            [alpha_0, beta_0] = get_alpha_0_beta_0(a_m);
+            [alpha_0, beta_0] = get_alpha_beta(a_m);
             t_m = (a_m^(3/2) / sqrt(mu)) * ((alpha_0-beta_0) - (sin(alpha_0) - sin(beta_0)));
-
-            % Determine alpha and beta based on transfer differentiation
-            if (delta_theta) <= pi && (dt <= t_m)
-                beta = beta_0; alpha = alpha_0;
-            elseif (delta_theta) <= pi && (dt > t_m)
-                beta = beta_0; alpha = 2*pi - alpha_0;
-            elseif (delta_theta) > pi && (dt <= t_m)
-                beta = -1 * beta_0; alpha = alpha_0;
-            elseif (delta_theta) > pi && (dt > t_m)
-                beta = -1 * beta_0; alpha = 2*pi - alpha_0;
-            else
-                error("Angle between vectors and min energy transfer do not correlate. Abort")
-            end
 
             % Set initial guesses for a
             a_n1 = factors(1) * a_m;
             a_n2 = factors(2) * a_m;
 
-            % Pass function
-            f_pass = @(x) f(x, alpha, beta);
+            f_pass = @(x) f(x, dt, t_m, mu);
             
             % Perform secant method to find a
             [a, a_all] = obj.perform_secant_method(f_pass, a_n1, a_n2, max_iterations, tolerance);
+
+            % Get alphas and betas with iterated as
+            [alpha, beta] = get_alpha_beta(a);
+            [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m);
 
             % Determine velocities
             u_1 = rr_1 / n_rr_1;

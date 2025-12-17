@@ -15,7 +15,7 @@ IT = InterplanetaryTransfers;
 
 [vv_1, vv_2, a] = IT.solve_lamberts_problem_secant(rr_1, rr_2, delta_theta, dt, mu_converted, factors, 20, 1E-8);
 
-fac = 1731.456
+fac = 1731.456;
 
 vv_1 = vv_1 * fac
 vv_2 = vv_2 * fac
