@@ -62,6 +62,61 @@ classdef InterplanetaryTransfers
             x = x_current;
 
         end
+        
+        function T = parse_horizon_file(filename)
+            % Parse JPL Horizons output file (position + velocity)
+            % Input:  filename - path to Horizons text file
+            % Output: 
+            % T [table] Data table with dates, position, vecocity
+            fid = fopen(filename,'r');
+            if fid == -1
+                error('Cannot open file: %s', filename);
+            end
+    
+            dates = datetime.empty(0,1); % initialize as datetimedates = [];
+            r = [];
+            v = [];
+    
+            in_data = false;
+    
+            while ~feof(fid)
+                line = strtrim(fgetl(fid));
+
+                % Start of data
+                if contains(line,'$$SOE')
+                    in_data = true;
+                    continue
+                end
+
+                % End of data
+                if contains(line,'$$EOE')
+                    break
+                end
+
+                if in_data
+                    tokens = strsplit(line,',');
+                    if numel(tokens) < 8
+                        continue
+                    end
+
+                    % Parse calendar date (TDB)
+                    date_str = strtrim(tokens{2}); % e.g., 'A.D. 2030-Jun-01 00:00:00.0000'
+                    date_str = strrep(date_str,'A.D. ',''); % remove prefix
+                    dates(end+1,1) = datetime(date_str,'InputFormat','yyyy-MMM-dd HH:mm:ss.SSSS');
+
+                    % Positions as row
+                    r(end+1,:) = [str2double(tokens{3}), str2double(tokens{4}), str2double(tokens{5})];
+
+                    % Velocities as row
+                    v(end+1,:) = [str2double(tokens{6}), str2double(tokens{7}), str2double(tokens{8})];
+                end
+            end
+
+            % Create table from data
+            T = table(dates, r, v, 'VariableNames', {'Date', 'Position', 'Velocity'});
+    
+            fclose(fid);
+        end
     end
     methods
         function [vv_1, vv_2, a] = solve_lamberts_problem_secant(obj, rr_1, rr_2, delta_theta, dt, mu, factors, max_iterations, tolerance)
@@ -71,8 +126,12 @@ classdef InterplanetaryTransfers
             %%%% Input 
             
             % rr_1, rr_1 [3x1] position vectors [km]
+            % delta_theta [1x1] angle between positiion vectors
             % dt [1x1] delta t [sec]
             % mu [1x1] gravitational parameter
+            % factors [2x1] factors for a_m for initial guesses of a
+            % max_iterations [1x1] maximum iterations for lambert solver
+            % tolerance [1x1] tolerance value for lambert solver
 
             %%%% Output
             
@@ -152,6 +211,37 @@ classdef InterplanetaryTransfers
 
 
         end
+        
+        function create_porkchop_plot(lambert_solver_parameters, departure_data, arrival_data)
+
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % lambert_solver_parameters [struct] parameters for the lambert solver in a struct [-]
+
+            %%%% Output
+            
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            % Determine number of ephemeris in table
+            num_ephemeris_departure = height(departure_data);
+            num_ephemeris_arrival = height(arrival_data);
+
+            % Allocate output
+            v_inf = zeros(num_ephemeris_departure, num_ephemeris_arrival);
+
+            for i = 1:num_ephemeris_departure
+                for j = 1:num_ephemeris_arrival
+                %[vv_1, vv_2, a] = solve_lamberts_problem_secant(departure_vectors(k), arrival_vectors(k), )
+                end
+            end
+
+
+
+        end 
     end
+
 
 end
