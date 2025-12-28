@@ -63,7 +63,7 @@ classdef InterplanetaryTransfers
 
         end
         
-        function T = parse_horizon_file(filename)
+       function T = parse_horizon_file(filename, output_year)
             % Parse JPL Horizons output file (position + velocity)
             % Input:  filename - path to Horizons text file
             % Output: 
@@ -112,10 +112,41 @@ classdef InterplanetaryTransfers
                 end
             end
 
+            % Convert time
+            if output_year == "year"
+                v = v * 365.24217;
+            end
+
             % Create table from data
             T = table(dates, r, v, 'VariableNames', {'Date', 'Position', 'Velocity'});
     
             fclose(fid);
+        end
+
+        function angle = angle_between_vectors(a, b, r)
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % a, b [3x1] vectors where angle shall be found []
+            % r [3x1] rotation vectors which defines the rotation direction for the angle []
+
+
+            %%%% Output
+            
+            % angle [1x1] angle between vectors [rad]
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            a = a / norm(a);
+            b = b / norm(b);
+            r = r / norm(r);
+
+            % Signed angle
+            angle = atan2(dot(r, cross(a, b)), dot(a, b));
+
+            % Optional: map to [0, 2*pi)
+            angle = mod(angle, 2*pi);
+
         end
     end
     methods
@@ -212,7 +243,7 @@ classdef InterplanetaryTransfers
 
         end
         
-        function create_porkchop_plot(lambert_solver_parameters, departure_data, arrival_data)
+        function create_porkchop_plot(obj, lambert_solver_parameters, departure_data, arrival_data)
 
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
@@ -229,15 +260,39 @@ classdef InterplanetaryTransfers
             num_ephemeris_departure = height(departure_data);
             num_ephemeris_arrival = height(arrival_data);
 
+            lsp = lambert_solver_parameters;
+
+            % Determine roation vector of main body for angle determination
+            gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
+
             % Allocate output
-            v_inf = zeros(num_ephemeris_departure, num_ephemeris_arrival);
+            delta_v_inf = zeros(num_ephemeris_departure, num_ephemeris_arrival);
 
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
-                %[vv_1, vv_2, a] = solve_lamberts_problem_secant(departure_vectors(k), arrival_vectors(k), )
+                    dt = departure_data.Date(i) - arrival_data.Date(j);
+                    delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+
+                    [vv_1, vv_2, a] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+                    v_inf_dep = vv_1  - departure_data.Velocity(i,:);
+                    v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
+                    delta_v_inf(i, j) = norm(v_inf_dep - v_inf_arr);
+
+                    % Formatted output
+                    fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
                 end
             end
 
+            % Plot
+
+            % Create figure
+            figure('Name','Porkchop Plot ΔV');
+            contourf(convertTo(departure_data.Date,"excel"), convertTo(arrival_data.Date, "excel"), delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
+            grid on;
+            colorbar
+            xlabel('Departure Date')
+            ylabel('Arrival Date')
+            title('\DeltaV Porkchop Plot')
 
 
         end 
