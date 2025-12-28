@@ -270,13 +270,13 @@ classdef InterplanetaryTransfers
 
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
-                    dt = departure_data.Date(i) - arrival_data.Date(j);
+                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
                     delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
 
                     [vv_1, vv_2, a] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
                     v_inf_dep = vv_1  - departure_data.Velocity(i,:);
                     v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
-                    delta_v_inf(i, j) = norm(v_inf_dep - v_inf_arr);
+                    delta_v_inf(i, j) = norm(v_inf_dep) + norm(v_inf_arr);
 
                     % Formatted output
                     fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
