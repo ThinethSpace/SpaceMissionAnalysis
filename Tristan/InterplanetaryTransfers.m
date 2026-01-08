@@ -1,0 +1,166 @@
+classdef InterplanetaryTransfers
+    methods (Static)
+        function [x, x_all] = perform_secant_method(f, x0, x1, max_iterations, tolerance)
+            %%%%%%%Author: Tristan De La Cruz Hachiles, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % f [func] function to find roots of []
+            % x0, x1 [1x1] initial guesses of  t []
+            % max_iterations [1x1] maximum iterations
+            % tolerance [1x1] stop criteria
+
+            %%%% Output
+            
+            % x [1x1] root of f []
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            % ----------------
+            % Secant method.
+            % ----------------
+            
+            % Save iterations values for debugging
+            x_all = zeros(1,max_iterations+1);
+            x_all(1) = x0; 
+            x_all(2) = x1;
+
+            % returns initial guess if it is a root of f(x)
+            if f(x0) == 0
+                x = x0;
+                x_all = x_all(1:2);
+                return
+            end
+
+            if f(x1) == 0
+                x = x1;
+                x_all = x_all(1:2);
+                return
+            end 
+
+            % iteration
+            % Initialize the current guess for the iteration
+            x_current = x0;
+
+            for k = 1:max_iterations
+    
+                % If new guesses cause division by zero, value is found
+                if (f(x0) - f(x1)) == 0
+                    warning('Division by zero in secant method')
+                    x = x_current;
+                    return 
+                end
+                % stores results in arrays
+                x_all(k) = x_current;
+
+                % Check if tolerance is achieved
+                if abs(f(x_current)) < tolerance
+                    x = x_current;
+                    return
+                end
+
+                % Find new x value
+                x_current = x0 - f(x0) * (x0 - x1) / (f(x0) - f(x1));
+
+                % Update current guess for the next iteration
+                x0 = x1; x1 = x_current;
+            end
+
+            % If maximum iterations reached without convergence
+            warning('Maximum iterations reached.');
+            x = x_current;
+
+        end
+    end
+    methods
+        function [vv_1, vv_2, a] = solve_lamberts_problem_secant(obj, rr_1, rr_2, delta_theta, dt, mu, factors, max_iterations, tolerance)
+            
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % rr_1, rr_1 [3x1] position vectors [km]
+            % dt [1x1] delta t [sec]
+            % mu [1x1] gravitational parameter
+
+            %%%% Output
+            
+            % vv_1, vv_1 [3x1] velocity vectors [km/s]
+            % a [1x1] semi major axis
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            arguments
+               obj, rr_1, rr_2, delta_theta, dt, mu, factors, max_iterations, tolerance;
+            end
+
+            % Relevant norms
+            n_rr_1 = norm(rr_1); n_rr_2 = norm(rr_2);
+            
+            % Calculating chord length and semi parameter constants
+            c = sqrt(n_rr_1^2 + n_rr_2^2 - 2*n_rr_1*n_rr_2*cos(delta_theta));
+            s = (n_rr_1 + n_rr_2 + c) / 2;
+
+            % Get alpha and beta
+            function [alpha, beta] = get_alpha_beta(a)
+                    alpha = asin(sqrt(s/(2*a))) * 2;
+                beta = asin(sqrt((s-c)/(2*a))) * 2;
+            end
+
+            function [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m)
+                % Determine alpha and beta based on transfer differentiation
+                if (delta_theta) <= pi && (dt <= t_m)
+                    beta = beta; alpha = alpha;
+                elseif (delta_theta) <= pi && (dt > t_m)
+                    beta = beta; alpha = 2*pi - alpha;
+                elseif (delta_theta) > pi && (dt <= t_m)
+                    beta = -1 * beta; alpha = alpha;
+                elseif (delta_theta) > pi && (dt > t_m)
+                    beta = -1 * beta; alpha = 2*pi - alpha;
+                else
+                    error("Angle between vectors and min energy transfer do not correlate. Abort")
+                end
+            end
+        
+            % Lambert's Equation
+            function y = f(a, dt, t_m, mu)
+                [alpha, beta] = get_alpha_beta(a);
+                [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m);
+
+                y = a^(3/2) * (alpha - beta - (sin(alpha) - sin(beta))) - sqrt(mu) * dt;
+            end
+
+            % Minimum energy solution
+            a_m = s / 2;
+            [alpha_0, beta_0] = get_alpha_beta(a_m);
+            t_m = (a_m^(3/2) / sqrt(mu)) * ((alpha_0-beta_0) - (sin(alpha_0) - sin(beta_0)));
+
+            % Set initial guesses for a
+            a_n1 = factors(1) * a_m;
+            a_n2 = factors(2) * a_m;
+
+            f_pass = @(x) f(x, dt, t_m, mu);
+            
+            % Perform secant method to find a
+            [a, a_all] = obj.perform_secant_method(f_pass, a_n1, a_n2, max_iterations, tolerance);
+
+            % Get alphas and betas with iterated as
+            [alpha, beta] = get_alpha_beta(a);
+            [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m);
+
+            % Determine velocities
+            u_1 = rr_1 / n_rr_1;
+            u_2 = rr_2 / n_rr_2;
+            u_c = (rr_2 - rr_1) / c;
+
+            A = sqrt(mu/(4*a)) * cot(alpha/2);
+            B = sqrt(mu/(4*a)) * cot(beta/2);
+
+            vv_1 = (B+A) * u_c + (B-A) * u_1;
+            vv_2 = (B+A) * u_c - (B-A) * u_2;
+
+
+        end
+    end
+
+end
