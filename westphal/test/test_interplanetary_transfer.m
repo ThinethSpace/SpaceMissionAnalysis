@@ -3,11 +3,10 @@
 IT = InterplanetaryTransfers;
 OP = OrbitPropagation;
 
-mu_sun = 398600.440; %km³/s²;
 mu_sun_converted = 39.4784176; %AU³/year²
 mu_earth_converted = 1.1857 * 10^(-4);  %AU³/year²
-perigee_height = 1.34 * 10E-6; %AU
-Re = 4.26 * 10E-5; %AU
+perigee_height = 1.34 * 10^-6; %AU
+Re = 4.26 * 10^-5; %AU
 
 rr_1 = [0.605774717586, -0.80374565571, 0.00010684714]';
 rr_2 = [-0.01300489410, 1.575580535344, 0.033161980867]';
@@ -58,16 +57,28 @@ rr_perige = rr_perige_norm * r_p;
 
 [a, e, i, RAAN, omega, nu] = OP.convert_car2kep(rr_perige, vv_perige, mu_earth_converted);
 
-t1 = 10 * 60 ;
-t_step = 1 * 60;
+% ---- Unit conversion: AU/year -> km/s ----
+AU2km   = 1.495978707e8;                 % km
+yr2s    = 365.24219*24*3600;             % s
 
-Re_km = 6371;
-Re = Re_km;
+% Lengths
+a       = a * AU2km;                     % km
+Re      = Re * AU2km;                    % km
+rr_perige = rr_perige * AU2km;           % km
 
-a_km = a * 1.495978707e8;
-a = a_km
+% Velocities
+vv_perige = vv_perige * AU2km / yr2s;    % km/s
 
-[tt, R, V] = OP.propagate_orbit_keplar_newton(a, e, i, RAAN, omega, nu, 398600, 0, t1, t_step, 0 , 0, true);
+% Time
+t1 = 90 * 60;                      % s
+t_step = 60;                  % s
+
+
+
+% Gravitational parameter
+mu_earth = 398600;                       % km^3/s^2
+
+[tt, R, V, nunu, OMOM] = OP.propagate_orbit_keplar_newton(a, e, i, RAAN, omega, nu, mu_earth, 0, t1, t_step, 0 , 0, true);
 
 
 figure('Name','3D Orbit (ECI)');

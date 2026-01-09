@@ -375,7 +375,7 @@ classdef OrbitPropagation
         
             % Define the function for Newton's method
             f = @(H) M - e*sinh(H) + H;
-            df = @(H) e*cosh(H) - 1;
+            df = @(H) -1 * e*cosh(H) + 1;       % Changed here to use normal newton rapson method
         
             % Initial guess for E
             if e < 1.6
@@ -393,15 +393,13 @@ classdef OrbitPropagation
             end
         
             % Run Newton's method and calcualte true anomaly
-        
-            H = wrapTo2Pi(obj.perform_newtons_method(f, df, H_init));
 
-            % Compute sin and cos of true anomaly
-            sin_nu = sqrt(e^2 - 1) * sinh(H) / (1 + e * cosh(H));
-            cos_nu = (e + cosh(H)) / (1 + e * cosh(H));
+            opts.return_all = true;
+        
+            [H, H_all] = obj.perform_newtons_method(f, df, H_init, opts);
 
             % True anomaly
-            nu1 = atan2(sin_nu, cos_nu);
+            nu1 = atan(sqrt((e+1) / (e-1)) * tanh(H/2)) * 2;
 
             % For hyperbolic orbits, node drift is excluded
             OM1 = Omega0;
@@ -451,7 +449,15 @@ classdef OrbitPropagation
             R = zeros(Nt, 3);
             V = zeros(Nt, 3);
 
-            for n = 1:Nt
+            % Get initial position of satelite
+            [rr, vv] = obj.convert_kep2car(a, e, i, Omega0, omega, nu0, mu);
+            nunu(1) = nu0; % true anomaly vector
+            OmegaOmega(1) = Omega0; % RAAN vector
+            R(1, :) = rr'; % Position vector Matrix
+            V(1, :) = vv'; % Velocity vector Matrix
+
+            % Start propagation
+            for n = 2:Nt
                 t_current = tt(n);
 
                 if hyperbolic == false
