@@ -338,8 +338,79 @@ classdef OrbitPropagation
         
                 
         end
+
+        function [nu1, OM1, rr, vv] = propagate_orbit_increment_keplar_newton_hyperbolic(obj, a, e, i, Omega0, omega0, nu0, mu , t0, t1, R_E, J_2)
+
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % a [1x1] semi-major axis [km]
+            % e [1x1] eccentricity [-]
+            % i [1x1] inclination [rad]
+            % Omega0 [1x1] RAAN [rad]
+            % omega0 [1x1] argument of periapsis [rad]
+            % nu0 [1x1] true anomaly [rad]
+            % mu [1x1] gravitational parameter [km^3/s^2]
+            % t0 [1x1] initial time [s]
+            % t1 [1x1] time of progation [s]
+            % R_E [1x1] body's equatorial radius [km]
+            % J_2 [1x1] body's second dynamic form factor [-]
+            
+            %%%% Output
+            
+            % nu1 [1x1] propagated true anomaly
+            % OM1 [1x1] propagated RAAN with J_2
+            % rr [3x1] propagated position vector
+            % vv [3x1] propagated velocity vector
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+    
+            % Calculate initial values
         
-        function [tt, R, V, nunu, OmegaOmega] = propagate_orbit_keplar_newton(obj, a, e, i, Omega0, omega, nu0, mu , t0, t1, t_step, R_E, J_2)
+            H0 = asinh( sqrt(e^2 - 1) * sin(nu0) / (1 + e*cos(nu0)) );
+            M0 = e * sinh(H0) - H0;
+            n = sqrt(mu/(-a^3));
+            M = M0 + n * (t1 - t0);
+        
+            % Define the function for Newton's method
+            f = @(H) M - e*sinh(H) + H;
+            df = @(H) -1 * e*cosh(H) + 1;       % Changed here to use normal newton rapson method
+        
+            % Initial guess for E
+            if e < 1.6
+                if (-pi < M && M < 0) || (M > pi)
+                    H_init = M - e;
+                else
+                    H_init = M + e;
+                end
+            else
+                if (e < 3.6 && abs(M) > pi)
+                    H_init = M - sign(M) * e;
+                else
+                    H_init = M / (e - 1);
+                end
+            end
+        
+            % Run Newton's method and calcualte true anomaly
+
+            opts.return_all = true;
+        
+            [H, H_all] = obj.perform_newtons_method(f, df, H_init, opts);
+
+            % True anomaly
+            nu1 = atan(sqrt((e+1) / (e-1)) * tanh(H/2)) * 2;
+
+            % For hyperbolic orbits, node drift is excluded
+            OM1 = Omega0;
+            om1 = omega0;
+
+            [rr, vv] = obj.convert_kep2car(a, e, i, OM1, om1, nu1, mu);
+        
+                
+        end
+        
+        function [tt, R, V, nunu, OmegaOmega] = propagate_orbit_keplar_newton(obj, a, e, i, Omega0, omega, nu0, mu , t0, t1, t_step, R_E, J_2, hyperbolic)
 
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
@@ -357,6 +428,7 @@ classdef OrbitPropagation
             % t_step [1x1] time step of propagation [s]
             % R_E [1x1] body's equatorial radius [km]
             % J_2 [1x1] body's second dynamic form factor [-]
+            % hyperbolic [bool] true for propgation of hyperbolic orbits, if not: false
 
             %%%% Output
             
@@ -377,10 +449,23 @@ classdef OrbitPropagation
             R = zeros(Nt, 3);
             V = zeros(Nt, 3);
 
-            for n = 1:Nt
+            % Get initial position of satelite
+            [rr, vv] = obj.convert_kep2car(a, e, i, Omega0, omega, nu0, mu);
+            nunu(1) = nu0; % true anomaly vector
+            OmegaOmega(1) = Omega0; % RAAN vector
+            R(1, :) = rr'; % Position vector Matrix
+            V(1, :) = vv'; % Velocity vector Matrix
+
+            % Start propagation
+            for n = 2:Nt
                 t_current = tt(n);
 
-                [nu1, Omega1, rr, vv] = obj.propagate_orbit_increment_keplar_newton(a, e, i, Omega0, omega, nu0, mu, t0, t_current, R_E, J_2);
+                if hyperbolic == false
+                    [nu1, Omega1, rr, vv] = obj.propagate_orbit_increment_keplar_newton(a, e, i, Omega0, omega, nu0, mu, t0, t_current, R_E, J_2);
+                else
+                    [nu1, Omega1, rr, vv] = obj.propagate_orbit_increment_keplar_newton_hyperbolic(a, e, i, Omega0, omega, nu0, mu, t0, t_current, R_E, J_2);
+                end
+
         
                 % Compute the orbital parameters (nu, OM, rr, vv) for the current step
                 

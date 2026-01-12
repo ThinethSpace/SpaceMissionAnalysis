@@ -1,7 +1,7 @@
 classdef InterplanetaryTransfers
     methods (Static)
         function [x, x_all] = perform_secant_method(f, x0, x1, max_iterations, tolerance)
-            %%%%%%%Author: Tristan De La Cruz Hachiles, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input 
             
@@ -19,40 +19,31 @@ classdef InterplanetaryTransfers
             % ----------------
             % Secant method.
             % ----------------
-            
-            % Save iterations values for debugging
-            x_all = zeros(1,max_iterations+1);
-            x_all(1) = x0; 
-            x_all(2) = x1;
 
             % returns initial guess if it is a root of f(x)
             if f(x0) == 0
                 x = x0;
-                x_all = x_all(1:2);
                 return
             end
 
-            if f(x1) == 0
-                x = x1;
-                x_all = x_all(1:2);
-                return
-            end 
+            % Save iteratinos values for debugging
+            x_all = zeros(1,max_iterations+1);
 
             % iteration
             % Initialize the current guess for the iteration
             x_current = x0;
 
             for k = 1:max_iterations
-    
-                % If new guesses cause division by zero, value is found
-                if (f(x0) - f(x1)) == 0
-                    warning('Division by zero in secant method')
-                    x = x_current;
-                    return 
-                end
+                
                 % stores results in arrays
                 x_all(k) = x_current;
 
+                % If new guesses cause devition by zero, value is found
+                if (f(x0) - f(x1)) == 0
+                    x = x_current;
+                    return 
+                end
+                
                 % Check if tolerance is achieved
                 if abs(f(x_current)) < tolerance
                     x = x_current;
@@ -71,6 +62,92 @@ classdef InterplanetaryTransfers
             x = x_current;
 
         end
+        
+       function T = parse_horizon_file(filename, output_year)
+            % Parse JPL Horizons output file (position + velocity)
+            % Input:  filename - path to Horizons text file
+            % Output: 
+            % T [table] Data table with dates, position, vecocity
+            fid = fopen(filename,'r');
+            if fid == -1
+                error('Cannot open file: %s', filename);
+            end
+    
+            dates = datetime.empty(0,1); % initialize as datetimedates = [];
+            r = [];
+            v = [];
+    
+            in_data = false;
+    
+            while ~feof(fid)
+                line = strtrim(fgetl(fid));
+
+                % Start of data
+                if contains(line,'$$SOE')
+                    in_data = true;
+                    continue
+                end
+
+                % End of data
+                if contains(line,'$$EOE')
+                    break
+                end
+
+                if in_data
+                    tokens = strsplit(line,',');
+                    if numel(tokens) < 8
+                        continue
+                    end
+
+                    % Parse calendar date (TDB)
+                    date_str = strtrim(tokens{2}); % e.g., 'A.D. 2030-Jun-01 00:00:00.0000'
+                    date_str = strrep(date_str,'A.D. ',''); % remove prefix
+                    dates(end+1,1) = datetime(date_str,'InputFormat','yyyy-MMM-dd HH:mm:ss.SSSS');
+
+                    % Positions as row
+                    r(end+1,:) = [str2double(tokens{3}), str2double(tokens{4}), str2double(tokens{5})];
+
+                    % Velocities as row
+                    v(end+1,:) = [str2double(tokens{6}), str2double(tokens{7}), str2double(tokens{8})];
+                end
+            end
+
+            % Convert time
+            if output_year == "year"
+                v = v * 365.24217;
+            end
+
+            % Create table from data
+            T = table(dates, r, v, 'VariableNames', {'Date', 'Position', 'Velocity'});
+    
+            fclose(fid);
+        end
+
+        function angle = angle_between_vectors(a, b, r)
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % a, b [3x1] vectors where angle shall be found []
+            % r [3x1] rotation vectors which defines the rotation direction for the angle []
+
+
+            %%%% Output
+            
+            % angle [1x1] angle between vectors [rad]
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            a = a / norm(a);
+            b = b / norm(b);
+            r = r / norm(r);
+
+            % Signed angle
+            angle = atan2(dot(r, cross(a, b)), dot(a, b));
+
+            % Optional: map to [0, 2*pi)
+            angle = mod(angle, 2*pi);
+
+        end
     end
     methods
         function [vv_1, vv_2, a] = solve_lamberts_problem_secant(obj, rr_1, rr_2, delta_theta, dt, mu, factors, max_iterations, tolerance)
@@ -80,8 +157,12 @@ classdef InterplanetaryTransfers
             %%%% Input 
             
             % rr_1, rr_1 [3x1] position vectors [km]
+            % delta_theta [1x1] angle between positiion vectors
             % dt [1x1] delta t [sec]
             % mu [1x1] gravitational parameter
+            % factors [2x1] factors for a_m for initial guesses of a
+            % max_iterations [1x1] maximum iterations for lambert solver
+            % tolerance [1x1] tolerance value for lambert solver
 
             %%%% Output
             
@@ -103,7 +184,7 @@ classdef InterplanetaryTransfers
 
             % Get alpha and beta
             function [alpha, beta] = get_alpha_beta(a)
-                    alpha = asin(sqrt(s/(2*a))) * 2;
+                alpha = asin(sqrt(s/(2*a))) * 2;
                 beta = asin(sqrt((s-c)/(2*a))) * 2;
             end
 
@@ -161,6 +242,134 @@ classdef InterplanetaryTransfers
 
 
         end
+        
+        function create_porkchop_plot(obj, lambert_solver_parameters, departure_data, arrival_data)
+
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            
+            % lambert_solver_parameters [struct] parameters for the lambert solver in a struct [-]
+
+            %%%% Output
+            
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            % Determine number of ephemeris in table
+            num_ephemeris_departure = height(departure_data);
+            num_ephemeris_arrival = height(arrival_data);
+
+            lsp = lambert_solver_parameters;
+
+            % Determine roation vector of main body for angle determination
+            gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
+
+            % Allocate output
+            delta_v_inf = zeros(num_ephemeris_departure, num_ephemeris_arrival);
+
+            for i = 1:num_ephemeris_departure
+                for j = 1:num_ephemeris_arrival
+                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
+                    delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+
+                    [vv_1, vv_2, a] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+                    v_inf_dep = vv_1  - departure_data.Velocity(i,:);
+                    v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
+                    delta_v_inf(i, j) = norm(v_inf_dep) + norm(v_inf_arr);
+
+                    % Formatted output
+                    fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
+                end
+            end
+
+            % Plot
+
+            % Create figure
+            figure('Name','Porkchop Plot ΔV');
+            contourf(convertTo(departure_data.Date,"excel"), convertTo(arrival_data.Date, "excel"), delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
+            grid on;
+            colorbar
+            xlabel('Departure Date')
+            ylabel('Arrival Date')
+            title('\DeltaV Porkchop Plot')
+
+
+        end 
+        function [vv_inf_departure, date_departure, vv_inf_arrival, date_arrival]= ... 
+                    minimum_vinf_transfers(obj, lambert_solver_parameters, departure_data, arrival_data)
+
+            %%%%%%%Author: Tristan De La Cruz Hachiles, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input 
+            % departure_data:           ephemerides from origin planet
+            % arrival_data:             ephemerides from target planet
+            % lambert_solver_parameters [struct] parameters for the lambert solver in a struct [-]
+
+            %%%% Output
+            % vinf_departure:   lowest departure velocity from origin planet
+            % vinf_arrival:     lowest arrival velocity from target planet
+            % date_departure:   departure date from origin planet
+            % date_arrival:     arrival date to target planet
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            % Determine number of ephemeris in table
+            num_ephemeris_departure = height(departure_data);
+            num_ephemeris_arrival = height(arrival_data);
+            lsp = lambert_solver_parameters;
+
+            % Determine roation vector of main body for angle determination
+            gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
+
+            % Allocate output
+            vv_inf_departure        = zeros(1, 3);
+            vv_inf_arrival          = zeros(1, 3);
+            v_inf_arrival_min       = inf;
+            v_inf_departure_min     = inf;
+            v_inf_arrival_index     = 0;
+            v_inf_departure_index   = 0;
+
+            % TODO Create 2 structs as ouput:
+            % Struct1: v_inf minimal departure velocity and rEarth, rMars,
+            % dt1, dThetaDep (can be calculated from rEarth
+            % and rMars), vv_earthDep, vv_marsDep
+
+            % Struct2: v_ing minimal arrival velocity and rEarth, rMars
+            % dt2, dThetaArr, vv_earthArr, vv_marsArr
+
+            for i = 1:num_ephemeris_departure
+                for j = 1:num_ephemeris_arrival
+                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
+                    delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+
+                    [vv_1, vv_2, ~] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+                    v_inf_dep = vv_1  - departure_data.Velocity(i,:);
+                    v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
+                    
+                    % Store the newest lowest departure velocity solution
+                    if norm(v_inf_dep) < v_inf_departure_min
+                        v_inf_departure_min     = norm(v_inf_dep);
+                        vv_inf_departure        = v_inf_dep;
+                        v_inf_departure_index   = i;
+                    end
+                    
+                    % Store the newest lowest arrival velocity  solution
+                    if norm(v_inf_arr) < v_inf_arrival_min
+                        v_inf_arrival_min   = norm(v_inf_arr);
+                        vv_inf_arrival      = v_inf_arr;
+                        v_inf_arrival_index     = j;
+                    end
+                end
+            end
+            % Formatted output
+            fprintf('Minimum v_inf solutions: \n')
+            date_departure  = departure_data.Date(v_inf_departure_index);
+            date_arrival    = arrival_data.Date(v_inf_arrival_index);
+        end
+
+    % METHODS END    
     end
 
+% CLASS END
 end
