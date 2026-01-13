@@ -302,6 +302,7 @@ classdef InterplanetaryTransfers
             contourf(x_dn, y_dn, delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
             grid on;
             colorbar
+            ylabel(colorbar, 'Transfer energy proxy: ||v_{\infty,dep}|| + ||v_{\infty,arr}||');
             xlabel('Departure Date')
             ylabel('Arrival Date')
             title('Earth–Mars Porkchop Plot (2030–2033)')
