@@ -148,9 +148,22 @@ classdef InterplanetaryTransfers
             angle = mod(angle, 2*pi);
 
         end
+        function v_rot = rotateVector(v, k, theta)
+            % ROTATEVECTOR rotates a vector v around axis k by angle theta (radians)
+            % v: 3x1 vector to rotate
+            % k: 3x1 rotation axis (must be unit vector)
+            % theta: rotation angle in radians
+            %
+            % Returns v_rot: rotated vector
+        
+            % Ensure k is unit vector
+            k = k / norm(k);
+        
+            % Rodrigues' rotation formula
+            v_rot = v*cos(theta) + cross(k, v)*sin(theta) + k*dot(k, v)*(1 - cos(theta));
+        end
     end
     methods
-
         function [vv_1, vv_2, a] = solve_lamberts_problem_secant(obj, rr_1, rr_2, delta_theta, dt, mu, factors, max_iterations, tolerance)
             
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
@@ -245,79 +258,165 @@ classdef InterplanetaryTransfers
         end
         
         function create_porkchop_plot(obj, lambert_solver_parameters, departure_data, arrival_data)
+
+            %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input 
-            % lambert_solver_parameters [struct] Lambert solver parameters
-            % departure_data, arrival_data [table] ephemeris data (Date, Position, Velocity)
             
+            % lambert_solver_parameters [struct] parameters for the lambert solver in a struct [-]
+
             %%%% Output
-            % This function generates a porkchop plot (no direct return values)
             
 
-            % Number of available departure and arrival epochs
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            % Determine number of ephemeris in table
             num_ephemeris_departure = height(departure_data);
             num_ephemeris_arrival = height(arrival_data);
 
-            % Short name for Lambert solver parameters
             lsp = lambert_solver_parameters;
 
-            % Reference rotation vector used to determine transfer angle direction
+            % Determine roation vector of main body for angle determination
             gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
 
-            % Preallocate matrix for summed hyperbolic excess velocities
+            % Allocate output
             delta_v_inf = zeros(num_ephemeris_departure, num_ephemeris_arrival);
 
-            % Loop over all departure and arrival date combinations
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
-                    % Time of flight between departure and arrival dates [years]
-                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
-                    
-                    % Transfer angle between position vectors
+                    dt = years(arrival_data.Date(j) - departure_data.Date(i));
                     delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
-
-                    % Solve Lambert problem for this geometry and time of flight
-                    [vv_1, vv_2, a] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
                     
-                    % Hyperbolic excess velocities at departure and arrival
+                    if dt < 0
+                        % Plot fix high value for negative dt (not
+                        % realistic)
+                        delta_v_inf(i,j) = 1E10;
+                        continue
+                    end
+                    [vv_1, vv_2,~] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
                     v_inf_dep = vv_1  - departure_data.Velocity(i,:);
                     v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
-                    
-                    % Porkchop cost: sum of v-infinity magnitudes
                     delta_v_inf(i, j) = norm(v_inf_dep) + norm(v_inf_arr);
 
-                    % Print current indices and transfer angle for debugging
-                    %fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
+                    % Formatted output
+                    % fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
                 end
             end
 
-            % Create porkchop plot
+            % Plot
+
+            % Create figure
             figure('Name','Porkchop Plot ΔV');
-
-            % Convert datetime axes to datenums for contour plotting
-            x_dn = datenum(departure_data.Date);
-            y_dn = datenum(arrival_data.Date);
-
-            % Filled contour plot of delta_v_inf over departure/arrival dates
-            contourf(x_dn, y_dn, delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
+            contourf(convertTo(departure_data.Date,"excel"), convertTo(arrival_data.Date, "excel"), delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
             grid on;
             colorbar
-            ylabel(colorbar, 'Transfer energy proxy: ||v_{\infty,dep}|| + ||v_{\infty,arr}||');
             xlabel('Departure Date')
             ylabel('Arrival Date')
-            title('Earth–Mars Porkchop Plot (2030–2033)')
+            title('\DeltaV Porkchop Plot')
 
-            % Format axes to show readable calendar dates
-            ax = gca;
-            ax.XAxis.Exponent = 0;
-            ax.YAxis.Exponent = 0;
-            datetick('x','yyyy-mmm-dd','keeplimits','keepticks');
-            datetick('y','yyyy-mmm-dd','keeplimits','keepticks');
 
+        end 
+
+       function [vv_inf_min, ephem_dep, ephem_arr, dThetaMin, dT] = ... 
+                    minimum_vinf_vals(...
+                                 obj, lambert_solver_parameters, ...
+                                 departure_data, arrival_data, isDeparture ...
+                                 )
+
+            %%%%%%%Author: Tristan De La Cruz Hachiles, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%% Input
+            % departure_data:           ephemerides from origin planet
+
+            % arrival_data:             ephemerides from target planet
+
+            % lambert_solver_parameters:[struct] parameters for the lambert 
+            %                           solver in a struct [-]
+
+            % isDeparture:              boolean to return results for
+            %                           arrival or departure
+
+            %%%% Output
+            % dTheta:       Angle for selected departure arrival
+            % vv_inf_min:   lowest velocity for departure or arrival
+            % ephem_dep:    Ephemerides departure of minimum energy
+            % ephem_arr:    Ephemerides arrival of minimum energy
+            % dT:           Transfer time in years
+
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+            % Determine number of ephemeris in table
+            num_ephemeris_departure = height(departure_data);
+            num_ephemeris_arrival = height(arrival_data);
+            lsp = lambert_solver_parameters;
+
+            % Determine roation vector of main body for angle determination
+            gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
+
+            % Allocate output
+            vv_inf_min  = zeros(1, 3);
+            v_inf_norm  = inf;
+            dThetaMin   = 0.0;   % Angle of departure and arrival [rad]
+            ephem_dep   = table();
+            ephem_arr   = table();
+            dT          = NaN;
+
+            % Find out minimum excess velocity v_inf
+            for i = 1:num_ephemeris_departure
+                for j = 1:num_ephemeris_arrival
+                    dt = years(arrival_data.Date(j) - departure_data.Date(i));
+                    delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+                    
+                    % Skip negative dt
+                    if dt <= 0
+                        continue
+                    end
+
+                    [vv_1, vv_2, ~] = obj.solve_lamberts_problem_secant(... 
+                        departure_data.Position(i,:), ...
+                        arrival_data.Position(j,:), ...
+                        delta_theta, ...
+                        dt, ...
+                        lsp.mu, ...
+                        lsp.factors, ...
+                        lsp.max_iterations, ...
+                        lsp.tolerance);
+
+                    v_inf_dep = vv_1  - departure_data.Velocity(i,:);
+                    v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
+                    
+                    if isDeparture
+                        % Store lowest departure velocity
+                        if norm(v_inf_dep) < v_inf_norm
+                            v_inf_norm = norm(v_inf_dep);
+                            vv_inf_min  = v_inf_dep;
+                            ephem_dep   = departure_data(i,:);
+                            ephem_arr   = arrival_data(j, :);
+                            dThetaMin   = delta_theta;
+                            dT          = dt;
+
+                        end
+                    else
+                        % Store lowest arrival velocity
+                        if norm(v_inf_arr) < v_inf_norm
+                            v_inf_norm = norm(v_inf_arr);
+                            vv_inf_min      = v_inf_arr;
+                            ephem_dep       = departure_data(i,:);
+                            ephem_arr       = arrival_data(j,:);
+                            dThetaMin       = delta_theta;
+                            dT              = dt;
+                        end
+                    end
+
+                % ENDFOR DEPARTURES
+                end
+            % ENDFOR ARRIVALS
+            end            
         end
 
-
+    % METHODS END    
     end
 
-
+% CLASS END
 end

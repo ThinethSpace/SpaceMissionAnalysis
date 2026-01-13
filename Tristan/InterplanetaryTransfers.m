@@ -148,6 +148,20 @@ classdef InterplanetaryTransfers
             angle = mod(angle, 2*pi);
 
         end
+        function v_rot = rotateVector(v, k, theta)
+            % ROTATEVECTOR rotates a vector v around axis k by angle theta (radians)
+            % v: 3x1 vector to rotate
+            % k: 3x1 rotation axis (must be unit vector)
+            % theta: rotation angle in radians
+            %
+            % Returns v_rot: rotated vector
+        
+            % Ensure k is unit vector
+            k = k / norm(k);
+        
+            % Rodrigues' rotation formula
+            v_rot = v*cos(theta) + cross(k, v)*sin(theta) + k*dot(k, v)*(1 - cos(theta));
+        end
     end
     methods
         function [vv_1, vv_2, a] = solve_lamberts_problem_secant(obj, rr_1, rr_2, delta_theta, dt, mu, factors, max_iterations, tolerance)
@@ -270,16 +284,22 @@ classdef InterplanetaryTransfers
 
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
-                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
+                    dt = years(arrival_data.Date(j) - departure_data.Date(i));
                     delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
-
-                    [vv_1, vv_2, a] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+                    
+                    if dt < 0
+                        % Plot fix high value for negative dt (not
+                        % realistic)
+                        delta_v_inf(i,j) = 1E10;
+                        continue
+                    end
+                    [vv_1, vv_2,~] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
                     v_inf_dep = vv_1  - departure_data.Velocity(i,:);
                     v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
                     delta_v_inf(i, j) = norm(v_inf_dep) + norm(v_inf_arr);
 
                     % Formatted output
-                    fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
+                    % fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
                 end
             end
 
@@ -296,21 +316,33 @@ classdef InterplanetaryTransfers
 
 
         end 
-        function [vv_inf_departure, date_departure, vv_inf_arrival, date_arrival]= ... 
-                    minimum_vinf_transfers(obj, lambert_solver_parameters, departure_data, arrival_data)
+
+       function [vv_inf_min, ephem_dep, ephem_arr, dThetaMin, dT] = ... 
+                    minimum_vinf_vals(...
+                                 obj, lambert_solver_parameters, ...
+                                 departure_data, arrival_data, isDeparture ...
+                                 )
 
             %%%%%%%Author: Tristan De La Cruz Hachiles, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
-            %%%% Input 
+            %%%% Input
             % departure_data:           ephemerides from origin planet
+
             % arrival_data:             ephemerides from target planet
-            % lambert_solver_parameters [struct] parameters for the lambert solver in a struct [-]
+
+            % lambert_solver_parameters:[struct] parameters for the lambert 
+            %                           solver in a struct [-]
+
+            % isDeparture:              boolean to return results for
+            %                           arrival or departure
 
             %%%% Output
-            % vinf_departure:   lowest departure velocity from origin planet
-            % vinf_arrival:     lowest arrival velocity from target planet
-            % date_departure:   departure date from origin planet
-            % date_arrival:     arrival date to target planet
+            % dTheta:       Angle for selected departure arrival
+            % vv_inf_min:   lowest velocity for departure or arrival
+            % ephem_dep:    Ephemerides departure of minimum energy
+            % ephem_arr:    Ephemerides arrival of minimum energy
+            % dT:           Transfer time in years
+
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -323,49 +355,64 @@ classdef InterplanetaryTransfers
             gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
 
             % Allocate output
-            vv_inf_departure        = zeros(1, 3);
-            vv_inf_arrival          = zeros(1, 3);
-            v_inf_arrival_min       = inf;
-            v_inf_departure_min     = inf;
-            v_inf_arrival_index     = 0;
-            v_inf_departure_index   = 0;
+            vv_inf_min  = zeros(1, 3);
+            v_inf_norm  = inf;
+            dThetaMin   = 0.0;   % Angle of departure and arrival [rad]
+            ephem_dep   = table();
+            ephem_arr   = table();
+            dT          = NaN;
 
-            % TODO Create 2 structs as ouput:
-            % Struct1: v_inf minimal departure velocity and rEarth, rMars,
-            % dt1, dThetaDep (can be calculated from rEarth
-            % and rMars), vv_earthDep, vv_marsDep
-
-            % Struct2: v_ing minimal arrival velocity and rEarth, rMars
-            % dt2, dThetaArr, vv_earthArr, vv_marsArr
-
+            % Find out minimum excess velocity v_inf
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
-                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
+                    dt = years(arrival_data.Date(j) - departure_data.Date(i));
                     delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+                    
+                    % Skip negative dt
+                    if dt <= 0
+                        continue
+                    end
 
-                    [vv_1, vv_2, ~] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+                    [vv_1, vv_2, ~] = obj.solve_lamberts_problem_secant(... 
+                        departure_data.Position(i,:), ...
+                        arrival_data.Position(j,:), ...
+                        delta_theta, ...
+                        dt, ...
+                        lsp.mu, ...
+                        lsp.factors, ...
+                        lsp.max_iterations, ...
+                        lsp.tolerance);
+
                     v_inf_dep = vv_1  - departure_data.Velocity(i,:);
                     v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
                     
-                    % Store the newest lowest departure velocity solution
-                    if norm(v_inf_dep) < v_inf_departure_min
-                        v_inf_departure_min     = norm(v_inf_dep);
-                        vv_inf_departure        = v_inf_dep;
-                        v_inf_departure_index   = i;
+                    if isDeparture
+                        % Store lowest departure velocity
+                        if norm(v_inf_dep) < v_inf_norm
+                            v_inf_norm = norm(v_inf_dep);
+                            vv_inf_min  = v_inf_dep;
+                            ephem_dep   = departure_data(i,:);
+                            ephem_arr   = arrival_data(j, :);
+                            dThetaMin   = delta_theta;
+                            dT          = dt;
+
+                        end
+                    else
+                        % Store lowest arrival velocity
+                        if norm(v_inf_arr) < v_inf_norm
+                            v_inf_norm = norm(v_inf_arr);
+                            vv_inf_min      = v_inf_arr;
+                            ephem_dep       = departure_data(i,:);
+                            ephem_arr       = arrival_data(j,:);
+                            dThetaMin       = delta_theta;
+                            dT              = dt;
+                        end
                     end
-                    
-                    % Store the newest lowest arrival velocity  solution
-                    if norm(v_inf_arr) < v_inf_arrival_min
-                        v_inf_arrival_min   = norm(v_inf_arr);
-                        vv_inf_arrival      = v_inf_arr;
-                        v_inf_arrival_index     = j;
-                    end
+
+                % ENDFOR DEPARTURES
                 end
-            end
-            % Formatted output
-            fprintf('Minimum v_inf solutions: \n')
-            date_departure  = departure_data.Date(v_inf_departure_index);
-            date_arrival    = arrival_data.Date(v_inf_arrival_index);
+            % ENDFOR ARRIVALS
+            end            
         end
 
     % METHODS END    
