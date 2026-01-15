@@ -21,7 +21,7 @@ omega_leo = sqrt(mu_earth / (a_leo)^3); % rad/s
 % of the Hohman transfer orbit (elliptical orbit between LEO and GEO)
 a_trans = (a_leo + a_geo) / 2; % km
 t_trans = pi * sqrt(a_trans^3 / mu_earth);  % s
-alpha_lead = omega_geo * t_trans;   % rad
+alpha_lead = omega_geo * t_trans  % rad
 
 % Calculate dTheta angle between ut0 and till RAAN. Also calculate Time
 dTheta = pi - deg2rad(ut0_deg); % rad
@@ -34,7 +34,7 @@ theta_new = lambda_int_1 - lambda_tar_1; % rad
 alpha_new = theta_new + pi; % rad
 
 % Now we determine the phasing orbit to determine it's semi major axis
-P_phase = (alpha_new - alpha_lead) / omega_geo; % s
+P_phase = (alpha_new - alpha_lead) / omega_geo % s
 
 % Calculate semi major axis of phasing orbit
 k_int = 1; % Only one revolution till node
@@ -65,15 +65,23 @@ disp(['Total deltaV for non-coplanar phasing maneuver: ', num2str(deltaV_total),
 disp(['Transfer time for non-coplanar phasing maneuver: ', num2str(t_total), ' s']);
 disp(' ');
 
-%% b) Two burn inclination change at GEO
+%% b) Two burn minimimum inclination change at GEO
+v_init  = sqrt(2 * mu_earth / a_leo - mu_earth / a_phase)   ; % km/s
+v_trans_a = sqrt(2 * mu_earth / a_leo - mu_earth / a_trans); % km/s
+v_final = sqrt(mu_earth / a_geo); % km/s
+v_trans_b = sqrt(2 * mu_earth / a_geo - mu_earth / a_trans); % km/s
 
-% Instead of doing combined maneuver of circularization and inclination change,
-% we cando two separate burns at GEO. One circularaization burn and one inclination
-% change burn.
+% calculate s-ratio with Lisowski method
+factor1 = 1 / deg2rad(i_deg);
+factor2 = (v_init * v_trans_a) / (v_final * v_trans_b);
 
-deltaV_circ = abs(v_geo - v_trans2); % km/s
-deltaV_incl = 2 * v_geo * sin(deg2rad(i_deg)    / 2); % km/s
-deltaV_total_sep = deltaV1 + deltaV2 + deltaV_circ + deltaV_incl;
-disp(['DeltaV for circularization at GEO: ', num2str(deltaV_circ), ' km/s']);
-disp(['DeltaV for inclination change at GEO: ', num2str(deltaV_incl),   ' km/s']);
-disp(['Total deltaV for two-burn inclination change at GEO: ', num2str(deltaV_total_sep), ' km/s']);
+% Liswowski s-ratio
+s = factor1 * atan( sin(deg2rad(i_deg)) ... 
+                    / (factor2 + cos(deg2rad(i_deg))) ) % rad
+
+% total deltaV for two burns at GEO
+deltaV_first = sqrt(v_init ^ 2 + v_trans1 ^ 2 - 2 * v_init * v_trans1 * cos(s * deg2rad(i_deg))) % km/s
+deltaV_second = sqrt(v_final ^ 2 + v_trans2 ^ 2 - 2 * v_final * v_trans2 * cos((1 -s) * deg2rad(i_deg))) % km/s
+
+deltaV_total2 = deltaV1 + deltaV_first + deltaV_second; % km/s
+disp(['Total deltaV for two-burn minimum inclination change at GEO: ', num2str(deltaV_total2), ' km/s']);   
