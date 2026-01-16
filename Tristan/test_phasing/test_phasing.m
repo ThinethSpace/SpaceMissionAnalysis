@@ -66,10 +66,10 @@ disp(['Transfer time for non-coplanar phasing maneuver: ', num2str(t_total), ' s
 disp(' ');
 
 %% b) Two burn minimimum inclination change at GEO
-v_init  = sqrt(2 * mu_earth / a_leo - mu_earth / a_phase)   ; % km/s
-v_trans_a = sqrt(2 * mu_earth / a_leo - mu_earth / a_trans); % km/s
-v_final = sqrt(mu_earth / a_geo); % km/s
-v_trans_b = sqrt(2 * mu_earth / a_geo - mu_earth / a_trans); % km/s
+v_init      = sqrt(2 * mu_earth / a_leo - mu_earth / a_phase)   ; % km/s
+v_trans_a   = sqrt(2 * mu_earth / a_leo - mu_earth / a_trans); % km/s
+v_final     = sqrt(mu_earth / a_geo); % km/s
+v_trans_b   = sqrt(2 * mu_earth / a_geo - mu_earth / a_trans); % km/s
 
 % calculate s-ratio with Lisowski method
 factor1 = 1 / deg2rad(i_deg);
@@ -78,6 +78,7 @@ factor2 = (v_init * v_trans_a) / (v_final * v_trans_b);
 % Liswowski s-ratio
 s = factor1 * atan( sin(deg2rad(i_deg)) ... 
                     / (factor2 + cos(deg2rad(i_deg))) ) % rad
+% s = 0.006319440565421 % ARIS' numerical result
 
 % total deltaV for two burns at GEO
 deltaV_first = sqrt(v_init ^ 2 + v_trans1 ^ 2 - 2 * v_init * v_trans1 * cos(s * deg2rad(i_deg))) % km/s
