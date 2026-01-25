@@ -8,6 +8,7 @@ classdef OrbitManeuver
 
                 if (r_initial/2 > a_trans) || (r_final/2 > a_trans)
                     t_trans = 0;
+                    v_initial = 0; v_trans_a = 0; v_trans_b = 0; v_final = 0; phi_trans_b = 0;
                     return;
                 end                    
 
@@ -28,8 +29,8 @@ classdef OrbitManeuver
             end
     end
     methods
-        function [delta_v_phase, delta_v_trans1, delta_v_trans2] = perform_noncoplanar_phasing_circular_orbits( ...
-            obj, a_initial, i_initial, RAAN_initial, a_target, i_target, lambda_target_t0, u, mu, k_tgt)
+        function [delta_v_phase, delta_v_trans1, delta_v_trans2, t_total] = perform_noncoplanar_phasing_circular_orbits( ...
+            obj, a_initial, i_initial, RAAN_initial, a_target, i_target, lambda_target_t0, u, mu, k_tgt, split)
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input 
@@ -81,10 +82,32 @@ classdef OrbitManeuver
             v_trans1 = sqrt(2*mu / a_initial - mu/a_transfer);
             v_trans2 = sqrt(2*mu / a_target - mu/a_transfer);
 
-            % Delta vs
-            delta_v_phase = abs(v_phase - v_initial);
-            delta_v_trans1 = abs(v_trans1 - v_phase);
-            delta_v_trans2 = sqrt(v_trans2^2 + v_target^2 - 2*v_trans2*v_target*cos(i_initial - i_target));
+            t_total = delta_t_node + 2*pi*sqrt((a_phase^3) / mu) + t_transfer;
+
+            if ~split
+                % Delta vs
+                delta_v_phase = abs(v_phase - v_initial);
+                delta_v_trans1 = abs(v_trans1 - v_phase);
+                delta_v_trans2 = sqrt(v_trans2^2 + v_target^2 - 2*v_trans2*v_target*cos(i_initial - i_target));
+            else
+
+                % calculate s-ratio with Lisowski method
+                factor1 = 1 / (i_initial - i_target);
+                factor2 = (v_initial * v_trans1) / (v_target * v_trans2);
+
+                % Liswowski s-ratio
+                delta_i = i_initial-i_target;
+                s = factor1 * atan( sin(delta_i) ... 
+                    / (factor2 + cos(delta_i)) ); % rad
+                % s = 0.006319440565421 % ARIS' numerical result
+
+                % total deltaV for two burns at GEO
+                delta_v_phase = abs(v_phase - v_initial);
+                delta_v_trans1 = sqrt(v_initial ^ 2 + v_trans1 ^ 2 - 2 * v_initial * v_trans1 * cos(s * delta_i)); % km/s
+                delta_v_trans2 = sqrt(v_target ^ 2 + v_trans2 ^ 2 - 2 * v_target * v_trans2 * cos((1 -s) * delta_i)); % km/s
+            end
+
+
             
         end
         function [x_opt_all, t_w_opt_all, eta_opt_all] = perform_three_impulse_transfer(...

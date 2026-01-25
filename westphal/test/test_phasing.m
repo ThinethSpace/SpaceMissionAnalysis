@@ -17,4 +17,4 @@ a_geo = Re + h_geo;
 lambda_t0 = deg2rad(200);
 
 
-[delta_v_phase, delta_v_trans1, delta_v_trans2] = OM.perform_noncoplanar_phasing_circular_orbits(a_leo, i_leo, RAAN_leo, a_geo, 0, lambda_t0, u_t0, mu, 0)
+[delta_v_phase, delta_v_trans1, delta_v_trans2] = OM.perform_noncoplanar_phasing_circular_orbits(a_leo, i_leo, RAAN_leo, a_geo, 0, lambda_t0, u_t0, mu, 0, false)
