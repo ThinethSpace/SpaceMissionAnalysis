@@ -72,13 +72,3 @@ opts = optimoptions('fmincon','Display','iter','Algorithm','sqp', ...
                     'MaxFunctionEvaluations',1e5);
 
 [z_opt, J_opt] = fmincon(costfun, z0, [], [], [], [], lb, ub, [], opts);
-
-
-figure;
-subplot(2,1,1);
-stairs(1:params.N, rad2deg(z_opt.delta_opt), 'b', 'LineWidth', 1.5);
-ylabel('\delta_k [deg]'); xlabel('Thrust arc k'); grid on;
-
-subplot(2,1,2);
-stairs(1:params.N, c_opt, 'r', 'LineWidth', 1.5);
-ylabel('Throttle c_k'); xlabel('Thrust arc k'); grid on;
