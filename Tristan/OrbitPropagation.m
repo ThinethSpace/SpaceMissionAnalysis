@@ -518,7 +518,127 @@ classdef OrbitPropagation
             [tt, R, V] = obj.perform_rk4_2nd_ODE(f, g, t0, rr0, vv0, t1, t_step);
 
         end
-                
+
+        function [tt, R, V] = propagate_rk4_low_thrust(...
+            obj, r0, v0, t0, tf, dt, mu, amax, ck, deltak)
+
+            % r0, v0  : initial state [km], [km/s]
+            % t0, tf  : start and end times [s]
+            % dt      : integration step [s]
+            % mu      : gravitational parameter [km^3/s^2]
+            % amax    : max thrust acceleration [km/s^2]
+            % ck      : throttle [0,1]
+            % deltak  : out-of-plane steering angle [rad]
+
+            N = ceil((tf - t0)/dt);
+
+            tt = zeros(N+1,1);
+            R  = zeros(N+1,3);
+            V  = zeros(N+1,3);
+
+            r = r0(:);
+            v = v0(:);
+
+            tt(1) = t0;
+            R(1,:) = r';
+            V(1,:) = v';
+
+            for i = 1:N
+                % --- RK4 ---
+                [k1r, k1v] = dynamics_(r, v);
+                [k2r, k2v] = dynamics_(r + 0.5*dt*k1r, v + 0.5*dt*k1v);
+                [k3r, k3v] = dynamics_(r + 0.5*dt*k2r, v + 0.5*dt*k2v);
+                [k4r, k4v] = dynamics_(r + dt*k3r,     v + dt*k3v);
+
+                r = r + dt/6 * (k1r + 2*k2r + 2*k3r + k4r);
+                v = v + dt/6 * (k1v + 2*k2v + 2*k3v + k4v);
+
+                tt(i+1) = tt(i) + dt;
+                R(i+1,:) = r';
+                V(i+1,:) = v';
+            end
+
+            % ===============================
+            function [rdot, vdot] = dynamics_(r, v)
+
+                rnorm = norm(r);
+
+                % Gravity (two-body)
+                a_grav = -mu * r / rnorm^3;
+
+                % Thrust acceleration
+                if ck > 0
+                    t_hat = v / norm(v);
+                    h = cross(r, v);
+                    n_hat = h / norm(h);
+
+                    a_thrust = ck * amax * ...
+                        (cos(deltak)*t_hat + sin(deltak)*n_hat);
+                else
+                    a_thrust = [0;0;0];
+                end
+
+                rdot = v;
+                vdot = a_grav + a_thrust;
+            end
+            % ===============================
+
+    end
+
+    function J = objective_low_thrust(obj, z, params)
+        % Penalty-only objective for low-thrust GEO intercept
+        %
+        % z = [delta_1 ... delta_N  c_1 ... c_N]
+
+        % Unpack decision variables
+        N = params.N;
+        delta = z(1:N);
+        c     = z(N+1:2*N);
+
+        % Initial state
+        r = params.r0;
+        v = params.v0;
+
+        % 1) Coast phase
+        [~, R1, V1] = obj.propagate_rk4_low_thrust( ...
+            r, v, 0, params.tw, params.dt, ...
+            params.mu, params.amax, 0, 0);
+
+        r = R1(end,:)';
+        v = V1(end,:)';
+
+        % 2) Thrust arcs
+        dt_arc = params.tLT / N;
+
+        for k = 1:N
+            [~, Rk, Vk] = obj.propagate_rk4_low_thrust( ...
+                r, v, 0, dt_arc, params.dt, ...
+                params.mu, params.amax, c(k), delta(k));
+
+            r = Rk(end,:)';
+            v = Vk(end,:)';
+        end
+
+        tf = params.tw + params.tLT;
+
+        % 3) Orbital elements at tf
+        [a, e, inc, ~, ~] = obj.convert_car2kep(r, v, params.mu);
+
+        % 4) Longitude error
+        lambda_s = atan2(r(2), r(1));
+        lambda_t = params.lambda_t0 + params.nGEO * tf;
+
+        dLambda = atan2( sin(lambda_s - lambda_t), ...
+                        cos(lambda_s - lambda_t) );
+
+        % 5) Penalty-only objective
+        J = params.wa * ((a - params.rGEO)/1)^2 ...
+        + params.we * (e / 1e-3)^2 ...
+        + params.wi * (inc / deg2rad(0.1))^2 ...
+        + params.wl * (dLambda / deg2rad(0.1))^2 ...
+        + params.wu * sum(c.^2)/N;
+
+        end 
     end
 
 end
