@@ -137,15 +137,19 @@ classdef InterplanetaryTransfers
             % angle [1x1] angle between vectors [rad]
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            a = a / norm(a);
-            b = b / norm(b);
-            r = r / norm(r);
+            %a = a / norm(a);
+            %b = b / norm(b);
+            %r = r / norm(r);
 
             % Signed angle
-            angle = atan2(dot(r, cross(a, b)), dot(a, b));
+            %angle = atan2(dot(r, cross(a, b)), dot(a, b));
+            cos_angle = dot(a,b) / (norm(a)*norm(b));
+
+            angle = acos(cos_angle);
+
 
             % Optional: map to [0, 2*pi)
-            angle = mod(angle, 2*pi);
+            %angle = mod(angle, 2*pi);
 
         end
     end
@@ -213,8 +217,15 @@ classdef InterplanetaryTransfers
 
             % Minimum energy solution
             a_m = s / 2;
-            [alpha_0, beta_0] = get_alpha_beta(a_m);
-            t_m = (a_m^(3/2) / sqrt(mu)) * ((alpha_0-beta_0) - (sin(alpha_0) - sin(beta_0)));
+            [alpha_0_unc, beta_0_unc] = get_alpha_beta(a_m);
+
+            if delta_theta <= pi
+                beta_m = beta_0_unc;
+            else
+                beta_m = -beta_0_unc;
+            end
+
+            t_m = sqrt(a_m^3 / mu) * (pi - beta_m + sin(beta_m));
 
             % Set initial guesses for a
             a_n1 = factors(1) * a_m;
@@ -270,29 +281,62 @@ classdef InterplanetaryTransfers
 
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
-                    dt = years(departure_data.Date(i) - arrival_data.Date(j));
-                    delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+                    dt = years(arrival_data.Date(j) - departure_data.Date(i));
 
-                    [vv_1, vv_2, a] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), delta_theta, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
-                    v_inf_dep = vv_1  - departure_data.Velocity(i,:);
-                    v_inf_arr = vv_2 - arrival_data.Velocity(j,:);
-                    delta_v_inf(i, j) = norm(v_inf_dep) + norm(v_inf_arr);
+                    if dt < 0
+                        % Create arbitrary high number for non realistic transfer
+                       delta_v_inf(i, j) = 1E10;
+                       continue;
+                    end
+                    %delta_theta = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:), gravity_body_rotation_vector);
+
+                    angle_short = obj.angle_between_vectors(departure_data.Position(i,:), arrival_data.Position(j,:));
+
+                    angle_long = 2*pi - angle_short;
+
+                    [vv_1_s, vv_2_s, a_s] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), angle_short, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+                    [vv_1_l, vv_2_l, a_l] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), angle_long, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
+
+                    
+                    v_inf_dep_s = vv_1_s  - departure_data.Velocity(i,:);
+                    v_inf_arr_s = vv_2_s - arrival_data.Velocity(j,:);
+
+                    v_inf_dep_l = vv_1_l  - departure_data.Velocity(i,:);
+                    v_inf_arr_l = vv_2_l - arrival_data.Velocity(j,:);
+
+
+                    delta_v_inf(i, j) = norm(min([v_inf_dep_s, v_inf_dep_l])) + norm(min([v_inf_arr_s, v_inf_arr_l]));
 
                     % Formatted output
-                    fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
+                    %fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
                 end
             end
 
             % Plot
 
             % Create figure
+            % Create porkchop plot
             figure('Name','Porkchop Plot ΔV');
-            contourf(convertTo(departure_data.Date,"excel"), convertTo(arrival_data.Date, "excel"), delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
+
+            % Convert datetime axes to datenums for contour plotting
+            x_dn = datenum(departure_data.Date);
+            y_dn = datenum(arrival_data.Date);
+
+            % Filled contour plot of delta_v_inf over departure/arrival dates
+            contourf(x_dn, y_dn, delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
             grid on;
             colorbar
+            ylabel(colorbar, 'Transfer energy proxy: ||v_{\infty,dep}|| + ||v_{\infty,arr}||');
             xlabel('Departure Date')
             ylabel('Arrival Date')
-            title('\DeltaV Porkchop Plot')
+            title('Earth–Mars Porkchop Plot (2030–2033)')
+
+            % Format axes to show readable calendar dates
+            ax = gca;
+            ax.XAxis.Exponent = 0;
+            ax.YAxis.Exponent = 0;
+            datetick('x','yyyy-mmm-dd','keeplimits','keepticks');
+            datetick('y','yyyy-mmm-dd','keeplimits','keepticks');
 
 
         end 
