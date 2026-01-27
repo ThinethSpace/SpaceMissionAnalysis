@@ -109,8 +109,6 @@ disp(['Longitude error [deg]: ', num2str(rad2deg(dLambda))]);
 %% ================== PLOT TRAJECTORIES ==================
 OP.plot_low_thrust_history(R_opt, T_opt, params);
 
-
-
 %% =================== PLOT THRUST PROFILE ===================
 figure;
 
@@ -118,6 +116,7 @@ delta_opt = z_opt(1:12);
 c_opt = z_opt(13:24);
 N = length(delta_opt);
 arc_idx = 1:N;
+
 % Subplot 1: Cos and Sin of steering angles
 subplot(2,1,1);
 plot(arc_idx, cos(delta_opt), '-o', 'LineWidth', 2, 'DisplayName', 'cos(\delta_k)');
@@ -130,7 +129,7 @@ title('Steering Angle Components per Arc');
 legend;
 
 
-% Subplot 2: Throttle (stair plot)
+% Subplot 2: Throttle 
 subplot(2,1,2);
 plot(arc_idx, c_opt, 'LineWidth', 2);
 grid on;
