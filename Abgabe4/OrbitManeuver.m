@@ -240,7 +240,7 @@ classdef OrbitManeuver
         end
         function [x_opt_all, t_w_opt_all, delta_v_all, delta_lambda_all, nu_opt_all] = perform_two_impulse_transfer(obj, a_initial, i_initial, RAAN_initial, a_target, i_target, lambda_target_t0, u_t0, mu, num_half_orbit_revs)
 
-            % Determine relevant parameters for transfer orbit (Hohmann Transfer)
+            % Determine relevant parameters for transfer orbit
             r_initial = a_initial;
             r_target = a_target;
 
@@ -278,7 +278,7 @@ classdef OrbitManeuver
 
             end
 
-            function delta_lambda = determine_delta_lambda(t_w, t_transfer)
+            function delta_lambda = determine_delta_lambda(t_w, t_transfer)                
                 delta_lambda = abs(wrapToPi((RAAN_initial + pi) - lambda_target_t0 + omega_target * (t_w + t_transfer)));
             end
 
