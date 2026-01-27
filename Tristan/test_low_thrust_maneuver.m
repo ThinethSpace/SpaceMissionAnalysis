@@ -1,21 +1,4 @@
-%{
-Input:
-- x0          initial state
-- tw          waiting time
-- c[1..N]     throttles
-- delta[1..N] steering angles
 
-1) Coast phase:
-   propagate x0 → x1 over tw with ac = 0
-
-2) Thrust phase:
-   for k = 1..N
-       propagate over Δt_arc
-       using controls (ck, δk)
-
-Output:
-- final state x(tf)
-%}
 OP = OrbitPropagation;
 
 % Convert Kepplerian initial orbit into cartesian
@@ -29,20 +12,19 @@ om= deg2rad(0);     % rad
 % Information about Target in GEO
 lambda_t0 = deg2rad(200); % rad
 
-% Use given initial guess
+% Use given initial guess of chaser
 params.N     = 12;
 params.mu    = 398600.4418;             % km^3/s^2
 params.amax  = 1e-7;                    % km/s^2
 %params.amax = 0;
 params.tw    = 3 * 3600;                % 3 hours (seconds)
 params.tLT   = 10 * 86400;              % 10 days (seconds)
-%params.dt    = params.tLT / params.N ;  % s
 params.dt    = 60; % s 
 params.nu0   = nu;                      % rad
 params.n0    = sqrt(a ^ 3 / params.mu);
-
 [ params.r0, params.v0 ] = OP.convert_kep2car(a, e, i, OM, om, nu, params.mu );
 
+% Target initial information 
 params.rGEO = 42164;
 params.nGEO = sqrt(params.mu/params.rGEO^3);
 params.lambda_t0 = lambda_t0;
@@ -51,12 +33,14 @@ params.i_GEO = 0;
 params.OM_GEO = 0;
 params.om_GEO = 0;
 
+% Penalty weights
 params.wa = 1;
 params.we = 1;
 params.wi = 1;
 params.wl = 10;
 params.wu = 0;
 
+% Given initial guess for thrust profile
 alpha0 =  zeros(params.N,1);         % only tangential burns
 delta0 = -0.05 * ones(params.N,1);   % small normal bias (radians)
 c0     =  0.8  * ones(params.N,1);   % moderate–high throttle
@@ -64,6 +48,7 @@ c0     =  0.8  * ones(params.N,1);   % moderate–high throttle
 % Initial Z0
 z0 = [delta0; c0]; % Ignore alpha0
 
+% Lower and upper bounds for thrust profile
 lb = [ -2/pi * ones(params.N,1);   % beta lower boundary
         0    * ones(params.N,1) ]; % thrust lower boundary
 
@@ -93,10 +78,11 @@ disp(['Final cost J = ', num2str(J_opt)]);
 % This recomputes the full trajectory (coast + thrust)
 [R_opt, V_opt, T_opt] = OP.propagate_low_thrust_history(z_opt, params);
 
+
+%% ================== SANITY CHECKS ==================
 % This is a sanity check, but something is not 100% correct
 a = -params.mu / (2*(0.5*dot(V_opt(end,:),V_opt(end,:)) - params.mu/norm(R_opt(end,:))));
 
-%% ================== SANITY CHECKS ==================
 % Final time
 tf = T_opt(end);
 
@@ -125,7 +111,7 @@ OP.plot_low_thrust_history(R_opt, T_opt, params);
 
 
 
-
+%% =================== PLOT THRUST PROFILE ===================
 figure;
 
 delta_opt = z_opt(1:12);
@@ -152,7 +138,6 @@ xlabel('Thrust Arc k');
 ylabel('Throttle c_k');
 title('Throttle per Arc');
 ylim([0 1]); % Because c_k ∈ [0,1]
-%% Plot results  
 
 
 
