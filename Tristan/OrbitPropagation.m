@@ -569,7 +569,7 @@ classdef OrbitPropagation
                 % Thrust acceleration
                 if ck > 0
                     t_hat = v / norm(v);
-                    h = cross(r, v);
+                    h = cross(r,v);
                     n_hat = h / norm(h);
 
                     a_thrust = ck * amax * ...
@@ -583,62 +583,152 @@ classdef OrbitPropagation
             end
             % ===============================
 
-    end
-
-    function J = objective_low_thrust(obj, z, params)
-        % Penalty-only objective for low-thrust GEO intercept
-        %
-        % z = [delta_1 ... delta_N  c_1 ... c_N]
-
-        % Unpack decision variables
-        N = params.N;
-        delta = z(1:N);
-        c     = z(N+1:2*N);
-
-        % Initial state
-        r = params.r0;
-        v = params.v0;
-
-        % 1) Coast phase
-        [~, R1, V1] = obj.propagate_rk4_low_thrust( ...
-            r, v, 0, params.tw, params.dt, ...
-            params.mu, params.amax, 0, 0);
-
-        r = R1(end,:)';
-        v = V1(end,:)';
-
-        % 2) Thrust arcs
-        dt_arc = params.tLT / N;
-
-        for k = 1:N
-            [~, Rk, Vk] = obj.propagate_rk4_low_thrust( ...
-                r, v, 0, dt_arc, params.dt, ...
-                params.mu, params.amax, c(k), delta(k));
-
-            r = Rk(end,:)';
-            v = Vk(end,:)';
         end
 
-        tf = params.tw + params.tLT;
+        function J = objective_low_thrust(obj, z, params)
+            % Penalty-only objective for low-thrust GEO intercept
+            %
+            % z = [delta_1 ... delta_N  c_1 ... c_N]
 
-        % 3) Orbital elements at tf
-        [a, e, inc, ~, ~] = obj.convert_car2kep(r, v, params.mu);
+            % Unpack decision variables
+            N = params.N;
+            delta = z(1:N);
+            c     = z(N+1:2*N);
 
-        % 4) Longitude error
-        lambda_s = atan2(r(2), r(1));
-        lambda_t = params.lambda_t0 + params.nGEO * tf;
+            % Initial state
+            r = params.r0;
+            v = params.v0;
 
-        dLambda = atan2( sin(lambda_s - lambda_t), ...
-                        cos(lambda_s - lambda_t) );
+            % 1) Coast phase
+            [~, R1, V1] = obj.propagate_rk4_low_thrust( ...
+                r, v, 0, params.tw, params.dt, ...
+                params.mu, params.amax, 0, 0);
 
-        % 5) Penalty-only objective
-        J = params.wa * ((a - params.rGEO)/1)^2 ...
-        + params.we * (e / 1e-3)^2 ...
-        + params.wi * (inc / deg2rad(0.1))^2 ...
-        + params.wl * (dLambda / deg2rad(0.1))^2 ...
-        + params.wu * sum(c.^2)/N;
+            r = R1(end,:)';
+            v = V1(end,:)';
 
-        end 
+            % 2) Thrust arcs
+            dt_arc = params.tLT / N;
+
+            for k = 1:N
+                [~, Rk, Vk] = obj.propagate_rk4_low_thrust( ...
+                    r, v, 0, dt_arc, params.dt, ...
+                    params.mu, params.amax, c(k), delta(k));
+
+                r = Rk(end,:)';
+                v = Vk(end,:)';
+            end
+
+            tf = params.tw + params.tLT;
+
+            % 3) Orbital elements at tf
+            [a, e, inc, ~, ~] = obj.convert_car2kep(r, v, params.mu);
+
+            % 4) Longitude error
+            lambda_s = atan2(r(2), r(1));
+            lambda_t = params.lambda_t0 + params.nGEO * tf;
+            dLambda = wrapTo2Pi(lambda_s - lambda_t);
+
+            % 5) Penalty-only objective
+            J = params.wa * ((a - params.rGEO)/1)^2 ...
+            + params.we * (e / 1e-3)^2 ...
+            + params.wi * (rad2deg(inc) / 0.1)^2 ...
+            + params.wl * (rad2deg(dLambda) / 0.1)^2 ...
+            + params.wu * sum(c.^2)/N;
+
+            end 
+
+        function [R_hist, V_hist, T_hist] = propagate_low_thrust_history(obj, z, params)
+
+            N = params.N;
+
+            % ---- Control extraction ----
+            delta = z(1:N);
+            c     = z(N+1:2*N);
+
+            % ---- Initial state ----
+            r = params.r0;
+            v = params.v0;
+
+            R_hist = [];
+            V_hist = [];
+            T_hist = [];
+
+            % ---- Coast phase ----
+            [tv, R, V] = obj.propagate_rk4_low_thrust( ...
+                r, v, 0, params.tw, params.dt, ...
+                params.mu, params.amax, 0, 0);
+
+            R_hist = [R_hist; R];
+            V_hist = [V_hist; V];
+            T_hist = [T_hist; tv];
+
+            r = R(end,:)';
+            v = V(end,:)';
+            t = T_hist(end);
+
+            % ---- Thrust phase ----
+            dt_arc = params.tLT / N;
+
+            for k = 1:N
+                [tv, R, V] = obj.propagate_rk4_low_thrust( ...
+                    r, v, 0, dt_arc, params.dt, ...
+                    params.mu, params.amax, c(k), delta(k));
+
+                R_hist = [R_hist; R];
+                V_hist = [V_hist; V];
+                T_hist = [T_hist; t + tv];
+
+                r = R(end,:)';
+                v = V(end,:)';
+                t = T_hist(end);
+            end
+        end
+
+        function plot_low_thrust_history(obj, R_thrust, T_thrust, params_opt)
+
+            Nt = length(T_thrust);
+
+            % ---- Target propagation (GEO) ----
+            R_target = zeros(Nt,3);
+
+            for k = 1:Nt
+                nu_t = params_opt.lambda_t0 + params_opt.nGEO * T_thrust(k);
+
+                [r_t, ~] = OrbitPropagation.convert_kep2car( ...
+                    params_opt.rGEO, params_opt.e_GEO, ...
+                    params_opt.i_GEO, params_opt.OM_GEO, ...
+                    params_opt.om_GEO, nu_t, params_opt.mu);
+
+                R_target(k,:) = r_t';
+            end
+
+            % ---- Plot ----
+            figure; hold on;
+
+            plot3(R_thrust(:,1), R_thrust(:,2), R_thrust(:,3), ...
+                'b', 'LineWidth', 1.6);
+
+            plot3(R_target(:,1), R_target(:,2), R_target(:,3), ...
+                'r--', 'LineWidth', 1.6);
+
+            % ---- Earth ----
+            [xe,ye,ze] = sphere(40);
+            surf(6378*xe, 6378*ye, 6378*ze, ...
+                'FaceColor',[0.6 0.8 1], ...
+                'EdgeColor','none', ...
+                'FaceAlpha',0.3);
+
+            axis equal; grid on;
+            xlabel('x [km]');
+            ylabel('y [km]');
+            zlabel('z [km]');
+            legend('Chaser','Target (GEO)','Earth');
+            title('Low-Thrust GEO Rendezvous');
+            view(35,25);
+        end
+        
+    % END-METHODS
     end
-
+% END-CLASS
 end
