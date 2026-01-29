@@ -519,6 +519,288 @@ classdef OrbitPropagation
 
         end
                 
+        function [tt, R, V] = propagate_rk4_low_thrust(...
+            obj, r0, v0, t0, tf, dt, mu, amax, ck, deltak)
+
+            %%%%%%%Author: Tristan De La Cruz Hachiles, TUB 2026, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            %%%%%% Inputs:
+
+            % obj - Object instance (contains auxiliary methods like convert_car2kep)
+            % r0 - Initial position vector [3x1] in km
+            % v0 - Initial velocity vector [3x1] in km/s
+            % t0 - Initial time [s]
+            % tf - Final time [s]
+            % dt - Time step for RK4 integration [s]
+            % mu - Gravitational parameter [km^3/s^2]
+            % amax - Maximum thrust acceleration magnitude [km/s^2]
+            % ck - Throttle coefficient (0 = no thrust, 1 = full thrust)
+            % deltak - Thrust direction angle relative to velocity plane [rad]
+            
+            %%%% Outputs:
+
+            % tt - Time history [Nx1] in seconds
+            % R - Position history [Nx3] in km
+            % V - Velocity history [Nx3] in km/s
+
+            N = ceil((tf - t0)/dt);
+
+            tt = zeros(N+1,1);
+            R  = zeros(N+1,3);
+            V  = zeros(N+1,3);
+
+            r = r0(:);
+            v = v0(:);
+
+            tt(1) = t0;
+            R(1,:) = r';
+            V(1,:) = v';
+
+            for i = 1:N
+                % --- RK4 ---
+                [k1r, k1v] = dynamics_(r, v);
+                [k2r, k2v] = dynamics_(r + 0.5*dt*k1r, v + 0.5*dt*k1v);
+                [k3r, k3v] = dynamics_(r + 0.5*dt*k2r, v + 0.5*dt*k2v);
+                [k4r, k4v] = dynamics_(r + dt*k3r,     v + dt*k3v);
+
+                r = r + dt/6 * (k1r + 2*k2r + 2*k3r + k4r);
+                v = v + dt/6 * (k1v + 2*k2v + 2*k3v + k4v);
+
+                tt(i+1) = tt(i) + dt;
+                R(i+1,:) = r';
+                V(i+1,:) = v';
+            end
+
+            % ===============================
+            function [rdot, vdot] = dynamics_(r, v)
+                % Computes derivatives for RK4
+
+                %%%%%%%Author: Tristan De La Cruz Hachiles, TUB 2026, ALL RIGHTS RESERVED%%%%%%%%%%%%
+                %%%% Inputs:
+
+                % r - position vector [3x1]
+                % v - velocity vector [3x1]
+                
+                %%%% Outputs:
+
+                % rdot - time derivative of position = velocity [3x1]
+                % vdot - time derivative of velocity = acceleration [3x1]
+
+                rnorm = norm(r);
+
+                % Gravity (two-body)
+                a_grav = -mu * r / rnorm^3;
+
+                % Thrust acceleration
+                if ck > 0
+                    t_hat = v / norm(v);
+                    h = cross(r,v);
+                    n_hat = h / norm(h);
+
+                    a_thrust = ck * amax * ...
+                        (cos(deltak)*t_hat + sin(deltak)*n_hat);
+                else
+                    a_thrust = [0;0;0];
+                end
+
+                rdot = v;
+                vdot = a_grav + a_thrust;
+            end
+            % ===============================
+
+        end
+
+        function J = objective_low_thrust(obj, z, params)
+            %%%%%%%Author: Tristan De La Cruz Hachiles, TUB 2026, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            
+            % OBJECTIVE_LOW_THRUST Computes a penalty-only objective function for low-thrust GEO rendezvous.
+            %
+            %%%% Inputs:
+
+            % obj - Object instance (contains propagate_rk4_low_thrust and convert_car2kep)
+            % z - Decision variable vector [2N x 1], first N = delta angles, next N = throttle coefficients
+            % params - Struct with fields:
+                % N - Number of thrust arcs
+                % r0, v0 - Initial position and velocity [3x1]
+                % tw - Duration of coast phase [s]
+                % dt - Time step [s]
+                % mu - Gravitational parameter [km^3/s^2]
+                % amax - Maximum thrust acceleration [km/s^2]
+                % tLT - Total thrust phase duration [s]
+                % lambda_t0 - Initial target longitude [rad]
+                % nGEO - Mean motion of GEO target [rad/s]
+                % rGEO, e_GEO, i_GEO - Target orbital elements
+                % wa, we, wi, wl, wu - Penalty weights
+            
+            %%%% Output:
+
+            % J - Scalar penalty value representing deviation from desired GEO intercept
+
+            N = params.N;
+            delta = z(1:N);
+            c     = z(N+1:2*N);
+
+            % Initial state
+            r = params.r0;
+            v = params.v0;
+
+            % 1) Coast phase
+            [~, R1, V1] = obj.propagate_rk4_low_thrust( ...
+                r, v, 0, params.tw, params.dt, ...
+                params.mu, params.amax, 0, 0);
+
+            r = R1(end,:)';
+            v = V1(end,:)';
+
+            % 2) Thrust arcs
+            dt_arc = params.tLT / N;
+
+            for k = 1:N
+                [~, Rk, Vk] = obj.propagate_rk4_low_thrust( ...
+                    r, v, 0, dt_arc, params.dt, ...
+                    params.mu, params.amax, c(k), delta(k));
+
+                r = Rk(end,:)';
+                v = Vk(end,:)';
+            end
+
+            tf = params.tw + params.tLT;
+
+            % 3) Orbital elements at tf
+            [a, e, inc, ~, ~] = obj.convert_car2kep(r, v, params.mu);
+
+            % 4) Longitude error
+            lambda_s = atan2(r(2), r(1));
+            lambda_t = params.lambda_t0 + params.nGEO * tf;
+            dLambda = wrapTo2Pi(lambda_s - lambda_t);
+
+            % 5) Penalty-only objective
+            J = params.wa * ((a - params.rGEO)/1)^2 ...
+            + params.we * (e / 1e-3)^2 ...
+            + params.wi * (rad2deg(inc) / 0.1)^2 ...
+            + params.wl * (rad2deg(dLambda) / 0.1)^2 ...
+            + params.wu * sum(c.^2)/N;
+
+            end 
+
+        function [R_hist, V_hist, T_hist] = propagate_low_thrust_history(obj, z, params)
+
+            %%%%%%%Author: Tristan De La Cruz Hachiles, TUB 2026, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            % PROPAGATE_LOW_THRUST_HISTORY Generates full trajectory history for plotting/analysis.
+            %
+            %%%% Inputs:
+
+            % obj - Object instance
+            % z - Decision variable vector [2N x 1], first N = delta angles, next N = throttle coefficients
+            % params - Struct with fields as in objective_low_thrust
+            %
+
+            %%%% Outputs:
+
+            % R_hist - Position history [Nx3] km
+            % V_hist - Velocity history [Nx3] km/s
+            % T_hist - Time history [Nx1] s
+
+            N = params.N;
+
+            % ---- Control extraction ----
+            delta = z(1:N);
+            c     = z(N+1:2*N);
+
+            % ---- Initial state ----
+            r = params.r0;
+            v = params.v0;
+
+            R_hist = [];
+            V_hist = [];
+            T_hist = [];
+
+            % ---- Coast phase ----
+            [tv, R, V] = obj.propagate_rk4_low_thrust( ...
+                r, v, 0, params.tw, params.dt, ...
+                params.mu, params.amax, 0, 0);
+
+            R_hist = [R_hist; R];
+            V_hist = [V_hist; V];
+            T_hist = [T_hist; tv];
+
+            r = R(end,:)';
+            v = V(end,:)';
+            t = T_hist(end);
+
+            % ---- Thrust phase ----
+            dt_arc = params.tLT / N;
+
+            for k = 1:N
+                [tv, R, V] = obj.propagate_rk4_low_thrust( ...
+                    r, v, 0, dt_arc, params.dt, ...
+                    params.mu, params.amax, c(k), delta(k));
+
+                R_hist = [R_hist; R];
+                V_hist = [V_hist; V];
+                T_hist = [T_hist; t + tv];
+
+                r = R(end,:)';
+                v = V(end,:)';
+                t = T_hist(end);
+            end
+        end
+
+        function plot_low_thrust_history(obj, R_thrust, T_thrust, params_opt)
+            
+            %%%%%%%Author: Tristan De La Cruz Hachiles, TUB 2026, ALL RIGHTS RESERVED%%%%%%%%%%%%
+            % PLOT_LOW_THRUST_HISTORY Plots spacecraft trajectory and GEO target.
+            %
+            %%%% Inputs:
+
+            % obj - Object instance
+            % R_thrust - Position history of chaser [Nx3] km
+            % T_thrust - Time history corresponding to R_thrust [Nx1] s
+            % params_opt - Struct with target GEO elements and parameters:
+            % rGEO, e_GEO, i_GEO, OM_GEO, om_GEO, lambda_t0, nGEO, mu
+
+
+            Nt = length(T_thrust);
+
+            % ---- Target propagation (GEO) ----
+            R_target = zeros(Nt,3);
+
+            for k = 1:Nt
+                nu_t = params_opt.lambda_t0 + params_opt.nGEO * T_thrust(k);
+
+                [r_t, ~] = OrbitPropagation.convert_kep2car( ...
+                    params_opt.rGEO, params_opt.e_GEO, ...
+                    params_opt.i_GEO, params_opt.OM_GEO, ...
+                    params_opt.om_GEO, nu_t, params_opt.mu);
+
+                R_target(k,:) = r_t';
+            end
+
+            % ---- Plot ----
+            figure; hold on;
+
+            plot3(R_thrust(:,1), R_thrust(:,2), R_thrust(:,3), ...
+                'b', 'LineWidth', 1.6);
+
+            plot3(R_target(:,1), R_target(:,2), R_target(:,3), ...
+                'r--', 'LineWidth', 1.6);
+
+            % ---- Earth ----
+            [xe,ye,ze] = sphere(40);
+            surf(6378*xe, 6378*ye, 6378*ze, ...
+                'FaceColor',[0.6 0.8 1], ...
+                'EdgeColor','none', ...
+                'FaceAlpha',0.3);
+
+            axis equal; grid on;
+            xlabel('x [km]');
+            ylabel('y [km]');
+            zlabel('z [km]');
+            legend('Chaser','Target (GEO)','Earth');
+            title('Low-Thrust GEO Rendezvous');
+            view(35,25);
+        end
+        
     end
 
 end
