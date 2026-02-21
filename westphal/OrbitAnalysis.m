@@ -4,7 +4,7 @@ classdef OrbitAnalysis
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input
-            % lat1, lon1 [scalar] point 1 latitude and longitude [rad]
+            % lat1, lon1 [vector] point 1 latitude and longitude [rad]
             % lat2, lon2 [scalar] point 2 latitude and longitude [rad]
             % R [scalar] radius of the sphere 
             
@@ -16,7 +16,7 @@ classdef OrbitAnalysis
             % Haversine formula to calculate distance between two points on a sphere
             dLat = lat2 - lat1;
             dLon = lon2 - lon1;
-            a = sin(dLat/2)^2 + cos(lat1) * cos(lat2) * sin(dLon/2)^2;
+            a = sin(dLat/2).^2 + cos(lat1) .* cos(lat2) .* sin(dLon/2).^2;
             c = 2 * atan2(sqrt(a), sqrt(1-a));
             distance = R * c;
         end
@@ -36,7 +36,26 @@ classdef OrbitAnalysis
             swath_width = 2 * R_earth * Delta;
         end
 
-    end
+        function [lla, pts] = create_grid(n)
+            i = (0:n-1)' + 0.5;
+            phi = acos(1 - 2*i/n);
+            golden_ratio = (1 + sqrt(5)) / 2;
+            theta = 2 * pi * i / golden_ratio;
+
+            x = cos(theta) .* sin(phi);
+            y = sin(theta) .* sin(phi);
+            z = cos(phi);
+            pts = [x, y, z];
+
+            % LLA (Latitude, Longitude, Altitude)
+            lat = asind(pts(:,3));
+            lon = atan2d(pts(:,2), pts(:,1));
+            lla = [lat, lon, zeros(size(lat))];
+
+
+        end
+end
+
     methods
         function mrt = get_mean_revisit_time0(obj, lat_grid, lon_grid, tt, LLA_sat, dt, half_swath)
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
@@ -56,8 +75,9 @@ classdef OrbitAnalysis
             % Constants
             R_earth = 6371;             % km
 
-            % Create a Global Grid (Approx 2-degree spacing)
+            % Create a Global Grid (Approx 2-degree spacing) and start NorthWest
             grid_pts = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
+            %grid_pts = [lat_grid, lon_grid];
             num_pts = size(grid_pts, 1);
 
             sat_lat = deg2rad(LLA_sat(:,1));
@@ -88,7 +108,7 @@ classdef OrbitAnalysis
                 if length(rises) > 1
                     % Revisit time is the time from the START of one pass 
                     % to the START of the next pass.
-                    revisits = diff(rises) * dt / 3600; % Convert to hours
+                    revisits = diff(rises) * dt;
                     mrt_results(p) = mean(revisits);
                 else
                     mrt_results(p) = NaN; % Not enough passes to calculate mean
@@ -96,17 +116,9 @@ classdef OrbitAnalysis
             end
 
 
-            % Reshape for plotting
-            mrt_map = reshape(mrt_results, size(lat_grid));
-
-            figure;
-            imagesc([-180 180], [-80 80], mrt_map);
-            set(gca, 'YDir', 'normal');
-            colorbar;
-            title('Mean Revisit Time (Hours)');
-            xlabel('Longitude'); ylabel('Latitude');
-            colormap(jet);
-            
+            % Reshape for plotting and inverting because grid_points go from west to east
+            mrt = reshape(mrt_results, size(lat_grid))';
+            %mrt = mrt_results;           
 
         end
     end

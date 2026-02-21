@@ -43,5 +43,5 @@ times = start_time + tt_seconds;
 lla = eci2lla(R*1000, datevec(times));
 
 %Utils.plot_ground_track(lla(:,1), lla(:,2))
-Utils.plot_orbit_3D(R, R_E, 'test', 'x', 'y', 'z')
+Utils.plot_orbit_3D(R, R_E, 'test', 'x', 'y', 'z', "lines")
 

@@ -1,5 +1,5 @@
 % Define constants
-a = 6500; %km
+a = 7700; %km
 e = 0.01; 
 OM = 0;
 om = 0;
@@ -21,7 +21,7 @@ T = 2 * pi * sqrt(a^3 / mu);
 
 %  Propagate orbit and transform to keplarian elements
 t0 = 0;
-t1 = 2000 * T;
+t1 = 30 * T;
 t_step = 60;
 
 % Propagate orbit
@@ -35,10 +35,16 @@ times = start_time + tt_seconds;
 
 lla = eci2lla(R*1000, datevec(times));
 
-[lat_grid, lon_grid] = meshgrid(-80:2:80, -180:2:180);
+[lat_grid, lon_grid] = meshgrid(-80:1:80, -180:1:180);
+%[lla_grid, pts] = OA.create_grid(600);
+%lat_grid = lla_grid(:,1); lon_grid = lla_grid(:,2);
 
-OA.get_mean_revisit_time0(lat_grid, lon_grid, tt, lla, t_step);
+mrt = OA.get_mean_revisit_time0(lat_grid, lon_grid, tt, lla, t_step, 1000);
 
+mrt = mrt ./ 3600;
 
-%Utils.plot_ground_track(lla(:,1), lla(:,2))
+Utils.plot_colormap_earth([-80 80], [-180 180], mrt, 'Mean Revisit Time (Hours)')
 
+%Utils.plot_orbit_3D(pts, 1, 'test', 'x', 'y', 'z', "dots")
+
+Utils.plot_ground_track(lla(:,1), lla(:,2))

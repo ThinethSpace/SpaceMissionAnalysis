@@ -1,16 +1,20 @@
 classdef Utils
     methods (Static)
 
-        function plot_orbit_3D(R,Re,plot_title, x_label, y_label, z_label)
+        function plot_orbit_3D(R,Re,plot_title, x_label, y_label, z_label, type)
 
             
             figure('Name','3D Orbit');
 
-            plot3(R(:,1), R(:,2), R(:,3), 'LineWidth', 1.0); 
+            if type == "dots"
+                plot3(R(:,1), R(:,2), R(:,3),'.', 'MarkerSize', 30);
+            else
+                plot3(R(:,1), R(:,2), R(:,3), 'LineWidth', 1.0);
+            end
             hold on; grid on; axis equal;
             % Draw a translucent Earth
-            %[fX,fY,fZ] = sphere(80);
-            %surf(Re*fX, Re*fY, Re*fZ, 'FaceAlpha', 0.2, 'EdgeColor', 'none'); colormap gray;
+            [fX,fY,fZ] = sphere(80);
+            surf(Re*fX, Re*fY, Re*fZ, 'FaceAlpha', 0.9, 'EdgeColor', 'none'); colormap gray;
 
             % Make axes equal and set same range
             axis equal
@@ -73,5 +77,21 @@ classdef Utils
             
 
         end
+        
+        function plot_colormap_earth(lat_range, lon_range, data, title_plot)
+            figure;
+            % Display the data with NaNs transparent
+            h = imagesc(lon_range, lat_range, data);
+            set(h, 'AlphaData', ~isnan(data));
+                    
+            set(gca, 'YDir', 'normal');   % North up
+            colormap(jet);
+            colorbar;
+                    
+            title(title_plot);
+            xlabel('Longitude'); 
+            ylabel('Latitude');
+        end
+    
     end
 end
