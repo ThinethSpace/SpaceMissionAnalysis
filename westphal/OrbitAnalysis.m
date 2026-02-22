@@ -76,8 +76,8 @@ end
             R_earth = 6371;             % km
 
             % Create a Global Grid (Approx 2-degree spacing) and start NorthWest
-            grid_pts = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
-            %grid_pts = [lat_grid, lon_grid];
+            %grid_pts = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
+            grid_pts = [deg2rad(lat_grid), deg2rad(lon_grid)];
             num_pts = size(grid_pts, 1);
 
             sat_lat = deg2rad(LLA_sat(:,1));
@@ -117,8 +117,8 @@ end
 
 
             % Reshape for plotting and inverting because grid_points go from west to east
-            mrt = reshape(mrt_results, size(lat_grid))';
-            %mrt = mrt_results;           
+            %mrt = reshape(mrt_results, size(lat_grid))';
+            mrt = mrt_results;           
 
         end
     end

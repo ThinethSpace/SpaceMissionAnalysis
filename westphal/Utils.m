@@ -92,6 +92,32 @@ classdef Utils
             xlabel('Longitude'); 
             ylabel('Latitude');
         end
+
+        function plot_heatmap_earth(lat, lon, data, title_plot)
+
+            lat_ranges = -90:1:90;
+            lon_ranges = -180:1:180;
+
+            % --- 3. Compute Binned Average ---
+            % This bins the data and calculates the sum of Z in each cell
+            [N, x_edges, y_edges, x_bin, y_bin] = histcounts2(lon, lat, lon_ranges, lat_ranges);
+
+            res = accumarray([y_bin, x_bin], data, [], @(x)mean(x,'omitnan'), NaN);
+
+            figure;
+            % Display the data with NaNs transparent
+            h = imagesc([-180 180], [-90 90], res);
+            set(h, 'AlphaData', ~isnan(res));
+                    
+            set(gca, 'YDir', 'normal');   % North up
+            colormap(jet);
+            colorbar;
+                    
+            title(title_plot);
+            xlabel('Longitude'); 
+            ylabel('Latitude');
+
+        end
     
     end
 end
