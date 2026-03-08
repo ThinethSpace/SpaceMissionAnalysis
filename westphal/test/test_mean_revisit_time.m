@@ -21,11 +21,14 @@ T = 2 * pi * sqrt(a^3 / mu);
 
 %  Propagate orbit and transform to keplarian elements
 t0 = 0;
-t1 = 60 * T;
+t1 = 10* T;
 t_step = 60;
 
 % Propagate orbit
 [tt, R, V, nunu, OmegaOmega] = OP.propagate_orbit_keplar_newton(a, e, i, OM, om, nu0, mu, t0, t1, t_step, R_E, J_2, false);
+
+% Pass func
+%func = @(t, nu, Omega, rr, vv) OA.get_mean_revisit_time_increment(lat_grid, lon_grid, tt, lla, t_step, 1000);
 
 % Test
 start_time = datetime([2010 1 17 10 20 36]);
@@ -38,10 +41,10 @@ lla = eci2lla(R*1000, datevec(times));
 %[lat_grid, lon_grid] = meshgrid(-80:1:80, -180:1:180);
 %lla_grid = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
 [lla_grid, pts] = OA.create_grid(80000);
-lla_grid = lla_grid(1000:end - 1000, :);
-lat_grid = lla_grid(:,1); lon_grid = lla_grid(:,2);
+%lla_grid = lla_grid(1000:end - 1000, :);
+lat_grid = lla_grid(10000:end-10000,1); lon_grid = lla_grid(10000:end-10000,2);
 
-mrt = OA.get_mean_revisit_time0(lat_grid, lon_grid, tt, lla, t_step, 1000);
+mrt = OA.get_mean_revisit_time(lat_grid, lon_grid, tt, lla, t_step, 1000);
 
 mrt = mrt ./ 3600;
 

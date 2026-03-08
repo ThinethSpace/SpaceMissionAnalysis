@@ -95,8 +95,8 @@ classdef Utils
 
         function plot_heatmap_earth(lat, lon, data, title_plot)
 
-            lat_ranges = -90:1:90;
-            lon_ranges = -180:1:180;
+            lat_ranges = -90:2:90;
+            lon_ranges = -180:2:180;
 
             % --- 3. Compute Binned Average ---
             % This bins the data and calculates the sum of Z in each cell

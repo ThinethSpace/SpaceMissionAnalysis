@@ -410,7 +410,7 @@ classdef OrbitPropagation
                 
         end
         
-        function [tt, R, V, nunu, OmegaOmega] = propagate_orbit_keplar_newton(obj, a, e, i, Omega0, omega, nu0, mu , t0, t1, t_step, R_E, J_2, hyperbolic)
+        function [tt, R, V, nunu, OmegaOmega, func_return] = propagate_orbit_keplar_newton(obj, a, e, i, Omega0, omega, nu0, mu , t0, t1, t_step, R_E, J_2, hyperbolic, save_data, func)
 
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
@@ -438,23 +438,38 @@ classdef OrbitPropagation
 
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+            
+            arguments
+                obj; a; e; i; Omega0; omega; nu0; mu; t0; t1; t_step; R_E; J_2;
+                hyperbolic = false;
+                save_data = true;
+                func = @(a, b, c, d, e) 0;
+            end
                 
             % Allocate memory for outputs
 
             Nt = floor((t1 - t0)/t_step) + 1;
             tt = linspace(t0, t1, Nt).';
         
-            nunu = zeros(Nt, 1);
-            OmegaOmega = zeros(Nt, 1);
-            R = zeros(Nt, 3);
-            V = zeros(Nt, 3);
+            if save_data
+                nunu = zeros(Nt, 1);
+                OmegaOmega = zeros(Nt, 1);
+                R = zeros(Nt, 3);
+                V = zeros(Nt, 3);
 
-            % Get initial position of satelite
-            [rr, vv] = obj.convert_kep2car(a, e, i, Omega0, omega, nu0, mu);
-            nunu(1) = nu0; % true anomaly vector
-            OmegaOmega(1) = Omega0; % RAAN vector
-            R(1, :) = rr'; % Position vector Matrix
-            V(1, :) = vv'; % Velocity vector Matrix
+                % Get initial position of satelite
+                [rr, vv] = obj.convert_kep2car(a, e, i, Omega0, omega, nu0, mu);
+                nunu(1) = nu0; % true anomaly vector
+                OmegaOmega(1) = Omega0; % RAAN vector
+                R(1, :) = rr'; % Position vector Matrix
+                V(1, :) = vv'; % Velocity vector Matrix
+            else
+                R = [];
+                V = [];
+                nunu = [];
+                OmegaOmega = [];
+            end
+        
 
             % Start propagation
             for n = 2:Nt
@@ -466,13 +481,16 @@ classdef OrbitPropagation
                     [nu1, Omega1, rr, vv] = obj.propagate_orbit_increment_keplar_newton_hyperbolic(a, e, i, Omega0, omega, nu0, mu, t0, t_current, R_E, J_2);
                 end
 
-        
+                func(t_current, nu1, Omega1, rr, vv); % Call user defined function with current parameters
+
                 % Compute the orbital parameters (nu, OM, rr, vv) for the current step
                 
-                nunu(n) = nu1; % true anomaly vector
-                OmegaOmega(n) = Omega1; % RAAN vector
-                R(n, :) = rr'; % Position vector Matrix
-                V(n, :) = vv'; % Velocity vector Matrix
+                if save_data
+                    nunu(n) = nu1; % true anomaly vector
+                    OmegaOmega(n) = Omega1; % RAAN vector
+                    R(n, :) = rr'; % Position vector Matrix
+                    V(n, :) = vv'; % Velocity vector Matrix
+                end
         
                 nu0 = nu1; % Update true anomaly for the next iteration
                 Omega0 = Omega1;
