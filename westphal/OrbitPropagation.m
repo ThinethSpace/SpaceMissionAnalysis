@@ -471,8 +471,12 @@ classdef OrbitPropagation
             end
         
 
+            h = waitbar(0,'Propagation in progress...');
             % Start propagation
             for n = 2:Nt
+
+                waitbar(n/Nt,h);
+
                 t_current = tt(n);
 
                 if hyperbolic == false
@@ -497,6 +501,8 @@ classdef OrbitPropagation
 
                 t0 = t_current;
             end
+
+            close(h);
                 
         end
     

@@ -4,12 +4,13 @@ classdef OrbitAnalysis
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input
-            % lat1, lon1 [vector] point 1 latitude and longitude [rad]
-            % lat2, lon2 [scalar] point 2 latitude and longitude [rad]
-            % R [scalar] radius of the sphere 
+            % lat1, lon1 [nx1] point 1 latitude and longitude [rad]
+            % lat2, lon2 [nx1] point 2 latitude and longitude [rad]
+            % R [1x1] radius of the sphere 
             
             %%%% Output
-            % distance [scalar] distance between the two points 
+            % distance [1x1] distance between the two points 
+            % c [1x1] central angle between the two points [rad]
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -73,26 +74,22 @@ classdef OrbitAnalysis
 end
 
     methods
-        function mrt = get_mean_revisit_time(obj, lat_grid, lon_grid, tt, LLA_sat, dt, half_swath)
+        function mrt = get_mean_revisit_time(obj, lat_grid, lon_grid, tt, LLA_sat, half_swath, R_earth)
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input
             % lat_grid [mxn] latitude grid points [deg]
             % lon_grid [mxn] longitude grid points [deg]
-            % tt [nx1] time vector [s]
+            % tt [nx1] time vector [sec]
             % LLA_sat [nx3] satellite lat, lon, alt [deg, deg, km]
-            % dt [scalar] time step [s]
+            % half_swath [1x1] half swath width [km]
 
             %%%% Output
-            % mrt [scalar] mean revisit time []
+            % mrt [1x1] mean revisit time [sec]
             
-            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            % Constants
-            R_earth = 6371;             % km
-
-            % Create a Global Grid (Approx 2-degree spacing) and start NorthWest
-            %grid_pts = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
+            % Conert grid to radians
             grid_pts = [deg2rad(lat_grid), deg2rad(lon_grid)];
             num_pts = size(grid_pts, 1);
 
@@ -141,25 +138,22 @@ end
             mrt(revisit_count == 0) = NaN;         
 
         end
-        function get_mean_revisit_time_increment(obj, t_start, t_current, rr, lat_grid, lon_grid,half_swath, data) 
+        function get_mean_revisit_time_increment(obj, t_start, t_current, rr, lat_grid, lon_grid,half_swath,R_earth, data) 
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
             
             %%%% Input
             % t_start [1x1] start time of the simulation [datetime]
             % t_current [1x1] current time in the simulation [s]
-            % rr [3x1] satellite position in ECI [km]
+            % rr [3x1] satellite position [km]
             % lat_grid [mxn] latitude grid points [deg]
             % lon_grid [mxn] longitude grid points [deg]
-            % half_swath [scalar] half swath width [km]
+            % half_swath [1x1] half swath width [km]
+            % R_earth [1x1] Earth radius [km]
             % data [SharedData] struct for storing intermediate results
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            % Constants
-            R_earth = 6371;             % km
-
-            % Create a Global Grid (Approx 2-degree spacing) and start NorthWest
-            %grid_pts = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
+            % Convert grid to radians
             grid_pts = [deg2rad(lat_grid), deg2rad(lon_grid)];
 
             % Get current LLA
@@ -192,7 +186,7 @@ end
         
         
         end
-        function get_mean_pass_duration_increment(obj, t_start, t_current, rr, lat_grid, lon_grid, min_elevation, data)
+        function get_mean_pass_duration_increment(obj, t_start, t_current, rr, lat_grid, lon_grid, min_elevation, R_earth, data)
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
 
             %%%% Input
@@ -201,16 +195,13 @@ end
             % rr [3x1] satellite position [km]
             % lat_grid [mxn] latitude grid points [deg]
             % lon_grid [mxn] longitude grid points [deg]
-            % half_swath [scalar] half swath width [km]
+            % half_swath [1x1] half swath width [km]
+            % R_earth [1x1] Earth radius [km]
             % data [PassDuration] Handle class for storing intermediate results
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            % Constants
-            R_earth = 6371;             % km
-
-            % Create a Global Grid (Approx 2-degree spacing) and start NorthWest
-            %grid_pts = [deg2rad(lat_grid(:)), deg2rad(lon_grid(:))];
+            % Convert grid to radians
             grid_pts = [deg2rad(lat_grid), deg2rad(lon_grid)];
 
             % Get current LLA
@@ -228,7 +219,7 @@ end
             e = obj.get_elevation_angle(R_earth, rr, c);
             current_access = min_elevation <= e;
         
-            % Detect rises and sets (0 -> 1)'
+            % Detect rises and sets
             rises = current_access & ~data.last_access;
             sets = ~current_access & data.last_access;
         

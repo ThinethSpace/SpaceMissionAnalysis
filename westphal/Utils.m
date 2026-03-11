@@ -74,6 +74,8 @@ classdef Utils
             xlim([-180 180])
             ylim([-90 90])
 
+            hold off
+
             
 
         end
