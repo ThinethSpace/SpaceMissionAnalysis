@@ -195,7 +195,6 @@ end
             % rr [3x1] satellite position [km]
             % lat_grid [mxn] latitude grid points [deg]
             % lon_grid [mxn] longitude grid points [deg]
-            % half_swath [1x1] half swath width [km]
             % R_earth [1x1] Earth radius [km]
             % data [PassDuration] Handle class for storing intermediate results
             

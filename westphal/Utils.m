@@ -104,7 +104,7 @@ classdef Utils
             % This bins the data and calculates the sum of Z in each cell
             [N, x_edges, y_edges, x_bin, y_bin] = histcounts2(lon, lat, lon_ranges, lat_ranges);
 
-            res = accumarray([y_bin, x_bin], data, [], @(x)mean(x,'omitnan'), NaN);
+            res = accumarray([y_bin, x_bin], data, [length(lat_ranges)-1 length(lon_ranges)-1], @(x)mean(x,'omitnan'), NaN);
 
             figure;
             % Display the data with NaNs transparent
