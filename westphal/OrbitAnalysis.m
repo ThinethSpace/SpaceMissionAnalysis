@@ -219,17 +219,31 @@ end
             current_access = min_elevation <= e;
         
             % Detect rises and sets
-            rises = current_access & ~data.last_access;
-            sets = ~current_access & data.last_access;
+            aos = current_access & ~data.last_access;
+            los = ~current_access & data.last_access;
         
             % If there was no previous rise, ignore the set
-            valid = sets & ~isnan(data.last_rise_time);
-            data.pass_sum(valid) = data.pass_sum(valid) + ...
-                                    (t_current - data.last_rise_time(valid));
-            data.pass_count(valid) = data.pass_count(valid) + 1;
-        
-            % Update rise times
-            data.last_rise_time(rises) = t_current;
+            valid_los = los & ~isnan(data.last_aos_time);
+            
+            % Check current time since AOS plus current sets
+            accepted_los = false(size(valid_los));
+            current_times = zeros(size(valid_los));
+            if any(valid_los)
+                current_times(current_access | valid_los) = t_current - data.last_aos_time(current_access | valid_los);
+                [~, idx] = max(current_times);
+                if valid_los(idx) == 1
+                    % Accept this LOS and update last_aos_time for current accessed ground stations
+                    accepted_los(idx) = 1; 
+                    data.last_aos_time(current_access) = t_current;
+
+                end
+            else
+                % No LOS to process, just update AOS times for newly accessed ground stations
+                data.last_aos_time(aos) = t_current;
+            end
+            data.pass_sum(accepted_los) = data.pass_sum(accepted_los) + ...
+                                (t_current - data.last_aos_time(accepted_los));
+            data.pass_count(accepted_los) = data.pass_count(accepted_los) + 1;
         
             % Update state
             data.last_access = current_access;

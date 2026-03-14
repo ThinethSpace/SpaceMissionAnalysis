@@ -62,9 +62,10 @@ priority = [1, 2, 3, 4]; % Priority for each ground station (1 = highest)
 % Pass func
 % Init array for storing data
 data.last_access = false(num_pts,1);
-data.last_rise_time = nan(num_pts,1);
+data.last_aos_time = nan(num_pts,1);
 data.pass_sum = zeros(num_pts,1);
 data.pass_count = zeros(num_pts,1);
+data.fom = zeros(num_pts,3);
 
 func = @(t, nu, Omega, rr, vv) OA.get_mean_pass_duration_increment(t_start, t, rr, lat_grid, lon_grid, min_elevation, R_E, data);
 
