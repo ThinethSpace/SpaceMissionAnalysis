@@ -17,7 +17,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     %% Frequency Properties
     c              = physconst("LightSpeed");
-    lamda          = c / frequency;
+    lambda          = c / frequency;
 
     XBAND_UPPER    = 7.75e9;
     XBAND_LOWER    = 7.25e9;
@@ -25,9 +25,9 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
     SBAND_LOWER    = 2.20e9;
 
     if frequency >= SBAND_LOWER && frequency <= SBAND_UPPER
-        freqBand = "SBAND";
+        freqBand = "S-Band";
     elseif frequency >= XBAND_LOWER && frequency <= XBAND_UPPER
-        freqBand = "XBAND";
+        freqBand = "X-Band";
     else
         error("Frequency outside supported bands");
     end
@@ -46,7 +46,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
     L_ion   = 0.1;
     L_atmos = 0.3;
 
-    if freqBand == "XBAND"
+    if freqBand == "X-Band"
         L_rain = 1.1;
     else
         L_rain = 0.3;
@@ -56,7 +56,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     %% Pointing Loss
     theta       = gs_struct.pointing_loss;
-    theta_3dB   = 70 * (lamda / gs_dish_diameter_m);
+    theta_3dB   = 70 * (lambda / gs_dish_diameter_m);
     L_dp        = 12 * (theta/theta_3dB)^2;
 
     %% Noise
@@ -84,12 +84,12 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
             dist = slantRangeCircularOrbit(angles(i), orbitalHeight_m, gs_altitude_m);
 
             % FSPL
-            FSPL    = (lamda/(4*pi*dist))^2;
-            FSPL_db = 10*log10(FSPL);
+            FSPL    = (lambda/(4*pi*dist))^2;
+            FSPL_db =  -10*log10(FSPL); %  Value is negative, adding a minus will make it a positive loss
 
             % Link equation
             Eb_N0_DOWNLINK = SAT_EIRP ...
-                + FSPL_db ...
+                - FSPL_db ...
                 - L_env ...
                 + G_Tsys_Ground ...
                 - boltzmann ...
@@ -101,6 +101,9 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
         end
 
+
+        title("Loss Contribution Percentage")
+
         % Plot for this orbital height
         plot(angles, margins_downlink, 'LineWidth',2)
 
@@ -110,12 +113,93 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     %% Formatting
     % add 3 dB Line
-    yline(3, '--', '3 dB limit', 'LineWidth', 2, 'Color', 'r');
-    legend(legend_entries, 'Location','best', 'FontSize', 14)
-    tit = "Link Budget Margin vs Elevation for Multiple Orbital Heights at " ...
-             + "downlink datarate of " + string(datarate / 1e3) + " KBit/s";
+    yline(3, '--', '3 dB limit', 'LineWidth', 2, 'Color', 'r', 'FontSize', 16);
+    legend(legend_entries, 'Location','northwest', 'FontSize', 14)
+    tit = string(freqBand ) + " Link Budget Margin vs Elevation for Multiple Orbital Heights at " ...
+             + "downlink datarate of " + string(datarate / 1e6) + " MBit/s";
     title(tit, "FontSize", 24)
     xlabel("Elevation (deg)","FontSize", 18)
     ylabel("Link Margin (dB)","FontSize", 18)
 
+    %% --------------------------------------------------
+    %% PROFESSIONAL WATERFALL LINK BUDGET DIAGRAM
+    %% (G/T - k grouped to avoid Boltzmann confusion)
+    %% --------------------------------------------------
+
+    % Worst case geometry
+    angle_loss = MIN_ELEV;
+    orbitalHeight_m = orbitalHeight_m_arr(1);
+
+    dist = slantRangeCircularOrbit(angle_loss, orbitalHeight_m, gs_altitude_m);
+
+    % Free Space Path Loss
+    FSPL    = (lambda/(4*pi*dist))^2;
+    FSPL_db = -10*log10(FSPL); % positive loss
+
+    % Receiver sensitivity term
+    GT_minus_k = G_Tsys_Ground - boltzmann;
+
+    steps = [
+        SAT_EIRP
+        -FSPL_db
+        -L_atmos
+        -L_rain
+        -L_ion
+        -L_dp
+        -gs_cable_loss
+        GT_minus_k
+        -dBHz
+        -RequiredEbByNo
+    ];
+
+    labels = [
+        "EIRP"
+        "FSPL"
+        "Atmosphere"
+        "Rain"
+        "Ionosphere"
+        "Pointing"
+        "GS Cable"
+        "Receiver (G/T - k)"
+        "Data Rate"
+        "Required Eb/N0"
+    ];
+
+    cumulative = cumsum(steps);
+
+    figure
+    hold on
+    grid on
+
+    for i = 1:length(steps)
+
+        if steps(i) >= 0
+            color = [0.2 0.7 0.2]; % gain
+        else
+            color = [0.9 0.3 0.3]; % loss
+        end
+
+        bar(i, steps(i),'FaceColor',color)
+
+    end
+
+    plot(cumulative,'k-o','LineWidth',2)
+
+    xticks(1:length(labels))
+    xticklabels(labels)
+    xtickangle(45)
+
+    ylabel("dB")
+    title(freqBand + ": Downlink Link Budget Waterfall Diagram")
+
+    margin = cumulative(end);
+
+    plot(length(labels), margin,'kp','MarkerSize',12,'MarkerFaceColor','yellow')
+
+    text(length(labels), margin, sprintf("  Margin = %.2f dB", margin), ...
+        'FontSize',12,'VerticalAlignment','bottom')
+
+    ylim([min(cumulative)-10 max(cumulative)+10])
+
+    hold off  
 end
