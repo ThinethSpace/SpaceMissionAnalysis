@@ -8,7 +8,7 @@ classdef OrbitAnalysis
             % lat2, lon2 [nx1] point 2 latitude and longitude [rad]
             % R [1x1] radius of the sphere 
             
-            %%%% Output
+            %%%% Output 
             % distance [1x1] distance between the two points 
             % c [1x1] central angle between the two points [rad]
             
@@ -69,7 +69,7 @@ classdef OrbitAnalysis
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             r_sat = norm(rr);
-            e = atan((r_sat .* cos(central_angle) - R_earth) ./ (r_sat .* sin(central_angle)));
+            e = atan2(r_sat .* cos(central_angle) - R_earth, r_sat .* sin(central_angle));
         end
 end
 
@@ -186,7 +186,7 @@ end
         
         
         end
-        function get_mean_pass_duration_increment(obj, t_start, t_current, rr, lat_grid, lon_grid, min_elevation, R_earth, data)
+        function get_mean_pass_duration_increment(obj, t_start, t_current, rr, lat_grid, lon_grid, min_elevation, R_earth, cloud_probability, data)
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
 
             %%%% Input
@@ -210,6 +210,8 @@ end
             sat_lat = deg2rad(sat_lla(1));
             sat_lon = deg2rad(sat_lla(2));
 
+
+
             % Vectorized Access Calculation
             [dist,c] = obj.haversine(grid_pts(:,1), grid_pts(:,2), ...
                                     sat_lat, sat_lon, R_earth);
@@ -218,35 +220,62 @@ end
             e = obj.get_elevation_angle(R_earth, rr, c);
             current_access = min_elevation <= e;
         
-            % Detect rises and sets
+            % Detect aos and los
             aos = current_access & ~data.last_access;
             los = ~current_access & data.last_access;
+
+            % Check if there has been aos before
+            signaling = current_access & data.last_access;
+
+            % Update FOM for currently accessed ground stations
+            data.fom(signaling,1) = data.fom(signaling,1) + e(signaling);
+            data.fom(signaling,2) = data.fom(signaling,2) + e(signaling) .* (t_current - data.last_aos_time(signaling));
+            % add here the fom for weather
         
             % If there was no previous rise, ignore the set
             valid_los = los & ~isnan(data.last_aos_time);
             
-            % Check current time since AOS plus current sets
+            % Evaluate which LOS to accept based on FOM
             accepted_los = false(size(valid_los));
-            current_times = zeros(size(valid_los));
+            current_fom = zeros(size(valid_los));
+            combined = current_access | valid_los;
             if any(valid_los)
-                current_times(current_access | valid_los) = t_current - data.last_aos_time(current_access | valid_los);
-                [~, idx] = max(current_times);
-                if valid_los(idx) == 1
-                    % Accept this LOS and update last_aos_time for current accessed ground stations
-                    accepted_los(idx) = 1; 
-                    data.last_aos_time(current_access) = t_current;
+                % Determine the total fom based from the components
+                current_fom(combined) = data.fom(combined,1) -  (1 / t_current - data.last_aos_time(combined) .* data.fom(combined,2));
 
+                % Add cloud probability here if available
+                % If clouds are present, set the FOM to a negative value to prevent selection of this LOS
+                current_fom(combined) = current_fom(combined) .*(2*(rand(size(current_fom(combined))) > cloud_probability(combined)) - 1);
+
+                % Find the GS that currently has the highest FOM
+                [~, idx] = max(current_fom);
+
+                % If the highest FOM is from a valid LOS, accept it
+                % Here, if only one LOS is valid, it can be still negative (due to cloads), so maximum FOM would then be some zero number
+                if valid_los(idx) == 1
+
+                    % Accept this LOS and reset FOM for all ground stations and set the last AOS for current accessed GS to current time, simulating a new AOS with that GS
+                    accepted_los(idx) = 1; 
+                    data.fom(:,:) = 0;
+                    data.last_aos_time(current_access) = t_current;
                 end
-            else
-                % No LOS to process, just update AOS times for newly accessed ground stations
-                data.last_aos_time(aos) = t_current;
             end
+
+            % Update pass duration for accepted LOS
             data.pass_sum(accepted_los) = data.pass_sum(accepted_los) + ...
                                 (t_current - data.last_aos_time(accepted_los));
             data.pass_count(accepted_los) = data.pass_count(accepted_los) + 1;
+
+            % Update AOS times for newly accessed ground stations
+            data.last_aos_time(aos) = t_current;
         
             % Update state
             data.last_access = current_access;
+
+            if t_current_seconds > seconds(30000)
+                disp(current_access)
+                i = 1;
+            end
         
         
         end

@@ -120,6 +120,47 @@ classdef Utils
             ylabel('Latitude');
 
         end
+
+        function plot_ground_station_range(ground_stations, height_apogee, height_perigee, min_elevation, R_earth, additional)
+
+            if ~additional
+                figure;
+            end
+            %psi_max = acos((R_earth/(R_earth+height_apogee))*cos(min_elevation));
+            %psi_min = acos((R_earth/(R_earth+height_perigee))*cos(min_elevation));
+            %alpha_max = pi/2 - min_elevation - psi_max;
+            %alpha_min = pi/2 - min_elevation - psi_min;
+
+            alpha_max = acos((R_earth/(R_earth+height_apogee))*cos(min_elevation)) - min_elevation;
+            alpha_min = acos((R_earth/(R_earth+height_perigee))*cos(min_elevation)) - min_elevation;
+            hold on;
+
+            for n = 1:size(ground_stations,1)
+                for m = 1:2
+                    if m == 1
+                        psi = alpha_max;
+                    else
+                        psi = alpha_min;
+                    end
+                    theta = linspace(0,2*pi,500);
+
+                    lat0 = ground_stations(n,1);   % station latitude
+                    lon0 = ground_stations(n,2);  % station longitude
+
+                    lat_circle = asin( sin(lat0)*cos(psi) + ...
+                                        cos(lat0)*sin(psi).*cos(theta) );
+
+                    lon_circle = lon0 + atan2( sin(theta).*sin(psi).*cos(lat0), ...
+                                                cos(psi)-sin(lat0).*sin(lat_circle) );
+
+                    hold on
+                    plot(rad2deg(lon_circle), rad2deg(lat_circle), 'g', 'LineWidth', 2)
+                end
+            end
+
+
+
+        end
     
     end
 end
