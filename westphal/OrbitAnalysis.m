@@ -186,7 +186,7 @@ end
         
         
         end
-        function get_mean_pass_duration_increment(obj, t_start, t_current, rr, lat_grid, lon_grid, min_elevation, R_earth, cloud_probability, data)
+        function get_mean_pass_duration_increment(obj, t_start, t_current, rr, lat_grid, lon_grid, min_elevation, R_earth, optical_availability, data)
             %%%%%%%Author: Kolja Westphal, ALL RIGHTS RESERVED%%%%%%%%%%%%
 
             %%%% Input
@@ -245,10 +245,11 @@ end
 
                 % Add cloud probability here if available
                 % If clouds are present, set the FOM to a negative value to prevent selection of this LOS
-                current_fom(combined) = current_fom(combined) .*(2*(rand(size(current_fom(combined))) > cloud_probability(combined)) - 1);
+                current_fom(combined) = current_fom(combined) .*(2*(rand(size(current_fom(combined))) < optical_availability(combined)) - 1);
 
                 % Find the GS that currently has the highest FOM
                 [~, idx] = max(current_fom);
+
 
                 % If the highest FOM is from a valid LOS, accept it
                 % Here, if only one LOS is valid, it can be still negative (due to cloads), so maximum FOM would then be some zero number

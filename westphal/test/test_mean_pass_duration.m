@@ -56,14 +56,14 @@ gs_optocom = [
 ];
 
 
-test_cloud_probability =[
-  0.0;
-  0.0;
-  0.0;
-  0.0;
-  0.0;
-  0.0;
-  0.0;
+test_optical_availability =[
+  1.0;
+  1.0;
+  1.0;
+  1.0;
+  1.0;
+  1.0;
+  1.0;
   ];
 
 lat_grid = gs_rf(:,1); lon_grid = gs_rf(:,2);

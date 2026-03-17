@@ -470,12 +470,8 @@ classdef OrbitPropagation
                 OmegaOmega = [];
             end
         
-
-            h = waitbar(0,'Propagation in progress...');
             % Start propagation
             for n = 2:Nt
-
-                waitbar(n/Nt,h);
 
                 t_current = tt(n);
 
@@ -502,8 +498,6 @@ classdef OrbitPropagation
                 t0 = t_current;
             end
 
-            close(h);
-                
         end
     
         function [tt, R, V] = propagate_orbit_EoM_rk4(obj, rr0, vv0, t0, t1, t_step, mu, R_E, J_2)
