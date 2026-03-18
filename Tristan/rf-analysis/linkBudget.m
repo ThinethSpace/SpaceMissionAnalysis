@@ -13,7 +13,9 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
     gs_dish_diameter_m          = gs_struct.dish_diameter;
     gs_altitude_m               = gs_struct.altitude;
     gs_cable_loss               = gs_struct.loss_cables;
+    gs_min_elevation            = gs_struct.min_elevation;
     RequiredEbByNo              = gs_struct.EbByN0;
+
 
     %% Frequency Properties
     c              = physconst("LightSpeed");
@@ -33,7 +35,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
     end
 
     %% Elevation sweep
-    MIN_ELEV = 5;
+    MIN_ELEV = gs_min_elevation;
     MAX_ELEV = 90;
     STEP     = 1;
 
@@ -111,15 +113,41 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     end
 
-    %% Formatting
-    % add 3 dB Line
-    yline(3, '--', '3 dB limit', 'LineWidth', 2, 'Color', 'r', 'FontSize', 16);
-    legend(legend_entries, 'Location','northwest', 'FontSize', 14)
-    tit = string(freqBand ) + " Link Budget Margin vs Elevation for Multiple Orbital Heights at " ...
-             + "downlink datarate of " + string(datarate / 1e6) + " MBit/s";
-    title(tit, "FontSize", 24)
-    xlabel("Elevation (deg)","FontSize", 18)
-    ylabel("Link Margin (dB)","FontSize", 18)
+    % 3 dB requirement line
+    yline(3,'--','3 dB requirement',...
+        'LineWidth',1.5,...
+        'Color',[0.8 0 0],...
+        'FontSize',10);
+
+    % Axis labels
+    xlabel('Elevation Angle (deg)','FontSize',12)
+    ylabel('Link Margin (dB)','FontSize',12)
+
+    % Title
+    title(freqBand + " Link Margin vs Elevation",'FontSize',12)
+
+    % Legend
+    legend(legend_entries,...
+        'Location','northwest',...
+        'FontSize',10,...
+        'Box','off')
+
+    % Data rate annotation
+    text(0.98,0.02,...
+        "Data rate: " + string(datarate/1e6) + " Mbit/s",...
+        'Units','normalized',...
+        'HorizontalAlignment','right',...
+        'VerticalAlignment','bottom',...
+        'FontSize',10,...
+        'BackgroundColor','w',...
+        'EdgeColor',[0.7 0.7 0.7])
+
+    % Grid styling
+    grid on
+    set(gca,...
+        'FontSize',11,...
+        'LineWidth',1,...
+        'GridAlpha',0.3)    %% Formatting
 
     %% --------------------------------------------------
     %% PROFESSIONAL WATERFALL LINK BUDGET DIAGRAM
