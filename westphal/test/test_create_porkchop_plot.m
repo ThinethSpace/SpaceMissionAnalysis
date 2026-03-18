@@ -11,8 +11,8 @@ IT = InterplanetaryTransfers;
 
 % Create struct of lambet solver parameters
 lsp.mu = mu_converted;
-lsp.factors = [1, 2];
-lsp.max_iterations = 20;
+lsp.factors = [1, 1.001];
+lsp.max_iterations = 100;
 lsp.tolerance = 1E-8;
 
 IT.create_porkchop_plot(lsp, earth_data, mars_data);

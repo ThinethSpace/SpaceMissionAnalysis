@@ -59,7 +59,7 @@ classdef InterplanetaryTransfers
 
             % If maximum iterations reached without convergence
             warning('Maximum iterations reached.');
-            x = x_current;
+            x = NaN;
 
         end
         
@@ -236,6 +236,12 @@ classdef InterplanetaryTransfers
             % Perform secant method to find a
             [a, a_all] = obj.perform_secant_method(f_pass, a_n1, a_n2, max_iterations, tolerance);
 
+            if isnan(a)
+                vv_1 = [];
+                vv_2 = [];
+                a = NaN;
+                return 
+            end
             % Get alphas and betas with iterated as
             [alpha, beta] = get_alpha_beta(a);
             [alpha, beta] = correct_angles_for_transfer_type(alpha, beta, dt, t_m);
@@ -277,7 +283,8 @@ classdef InterplanetaryTransfers
             gravity_body_rotation_vector = cross(departure_data.Position(1,:), departure_data.Position(2,:));
 
             % Allocate output
-            delta_v_inf = zeros(num_ephemeris_departure, num_ephemeris_arrival);
+            delta_v_inf_arr = zeros(num_ephemeris_departure, num_ephemeris_arrival);
+            C3 = zeros(num_ephemeris_departure, num_ephemeris_arrival);
 
             for i = 1:num_ephemeris_departure
                 for j = 1:num_ephemeris_arrival
@@ -297,15 +304,29 @@ classdef InterplanetaryTransfers
                     [vv_1_s, vv_2_s, a_s] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), angle_short, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
                     [vv_1_l, vv_2_l, a_l] = obj.solve_lamberts_problem_secant(departure_data.Position(i,:), arrival_data.Position(j,:), angle_long, dt, lsp.mu, lsp.factors, lsp.max_iterations, lsp.tolerance);
 
-                    
+                    if isnan(a_s) || isnan(a_l)
+                        continue;
+                    end
                     v_inf_dep_s = vv_1_s  - departure_data.Velocity(i,:);
                     v_inf_arr_s = vv_2_s - arrival_data.Velocity(j,:);
 
                     v_inf_dep_l = vv_1_l  - departure_data.Velocity(i,:);
                     v_inf_arr_l = vv_2_l - arrival_data.Velocity(j,:);
 
+                    delta_v_inf_s = norm(v_inf_dep_s) + norm(v_inf_arr_s);
+                    delta_v_inf_l = norm(v_inf_dep_l) + norm(v_inf_arr_l);
+                    
+                    if delta_v_inf_s < delta_v_inf_l
+                        v_inf_dep = v_inf_dep_s;
+                        v_inf_arr = v_inf_arr_s;
+                    else
+                        v_inf_dep = v_inf_dep_l;
+                        v_inf_arr = v_inf_arr_l;
+                    end
 
-                    delta_v_inf(i, j) = norm(min([v_inf_dep_s, v_inf_dep_l])) + norm(min([v_inf_arr_s, v_inf_arr_l]));
+
+                    delta_v_inf_arr(i, j) = norm(v_inf_arr);
+                    C3(i, j) = norm(v_inf_dep)^2;
 
                     % Formatted output
                     %fprintf('i = %d, j = %d, angle = %d\n', i, j, rad2deg(delta_theta))
@@ -323,7 +344,11 @@ classdef InterplanetaryTransfers
             y_dn = datenum(arrival_data.Date);
 
             % Filled contour plot of delta_v_inf over departure/arrival dates
-            contourf(x_dn, y_dn, delta_v_inf', 1:1:20, 'LineColor', 'none'); hold on;
+            AU2km  = 149597870.7;
+            year2s = 365.2422 * 86400;
+            AUyr2kms = AU2km / year2s;
+            dv_total = (sqrt(C3) + delta_v_inf_arr) * AUyr2kms;
+            contourf(x_dn, y_dn, dv_total', 1:1:20, 'LineColor', 'none'); hold on;
             grid on;
             colorbar
             ylabel(colorbar, 'Transfer energy proxy: ||v_{\infty,dep}|| + ||v_{\infty,arr}||');

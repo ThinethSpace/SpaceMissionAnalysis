@@ -13,4 +13,3 @@ J_2 = 0.00108263;
 % Propagate orbit
 nu = propagate_orbit(a, e, i, OM, om, nu0, mu, t0, t1, R_E, J_2);
 
-nu
