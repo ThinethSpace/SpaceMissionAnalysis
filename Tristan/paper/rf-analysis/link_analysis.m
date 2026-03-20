@@ -47,7 +47,8 @@ gs_xband.EbByN0         = 5;        % dB QPSK Convolutional 4
 
 %% Analysis
 
-alt = 200e3:50e3:400e3;
+% Altiude and inclination ranges
+alt = linspace(180, 400, 5) * 1000; % km
 
-linkBudget(sat_sband, gs_sband, alt);
-linkBudget(sat_xband, gs_xband, alt)
+
+linkBudget(sat_xband, gs_xband, alt);

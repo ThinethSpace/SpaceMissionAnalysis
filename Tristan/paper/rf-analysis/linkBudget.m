@@ -81,8 +81,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
         margins_downlink = zeros(1,length(angles));
 
         for i = 1:length(angles)
-
-            % Slant range
+ 
             dist = slantRangeCircularOrbit(angles(i), orbitalHeight_m, gs_altitude_m);
 
             % FSPL
@@ -103,9 +102,6 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
         end
 
-
-        title("Loss Contribution Percentage")
-
         % Plot for this orbital height
         plot(angles, margins_downlink, 'LineWidth',2)
 
@@ -113,32 +109,33 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     end
 
-    % 3 dB requirement line
+    axis tight
+
+    yl = ylim;
+    ylim([0, max(yl(2), 3) + 1])
+
+    ax = gca;
+    ax.FontSize = 16;
+    ax.LooseInset = ax.TightInset;
+
+        % 3 dB requirement line
     yline(3,'--','3 dB requirement',...
         'LineWidth',1.5,...
         'Color',[0.8 0 0],...
-        'FontSize',10);
-
-    % Axis labels
-    xlabel('Elevation Angle (deg)','FontSize',12)
-    ylabel('Link Margin (dB)','FontSize',12)
-
-    % Title
-    title(freqBand + " Link Margin vs Elevation",'FontSize',12)
-
+        'FontSize',18);
     % Legend
     legend(legend_entries,...
         'Location','northwest',...
-        'FontSize',10,...
+        'FontSize',14,...
         'Box','off')
 
     % Data rate annotation
-    text(0.98,0.02,...
+    text(0.98,0.25,...
         "Data rate: " + string(datarate/1e6) + " Mbit/s",...
         'Units','normalized',...
         'HorizontalAlignment','right',...
         'VerticalAlignment','bottom',...
-        'FontSize',10,...
+        'FontSize',14,...
         'BackgroundColor','w',...
         'EdgeColor',[0.7 0.7 0.7])
 
@@ -148,6 +145,13 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
         'FontSize',11,...
         'LineWidth',1,...
         'GridAlpha',0.3)    %% Formatting
+        % Axis labels
+    xlabel('Elevation Angle (°)','FontSize',18)
+    ylabel('Link Margin (dB)','FontSize',18)
+    xlim([MIN_ELEV, MAX_ELEV])
+    % Title
+    title(freqBand + " Link Margin vs Elevation",'FontSize',16)
+
 
     %% --------------------------------------------------
     %% PROFESSIONAL WATERFALL LINK BUDGET DIAGRAM
@@ -156,7 +160,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     % Worst case geometry
     angle_loss = MIN_ELEV;
-    orbitalHeight_m = orbitalHeight_m_arr(1);
+    orbitalHeight_m = orbitalHeight_m_arr(end); % highest altitude
 
     dist = slantRangeCircularOrbit(angle_loss, orbitalHeight_m, gs_altitude_m);
 
@@ -187,7 +191,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
         "Rain"
         "Ionosphere"
         "Pointing"
-        "GS Cable"
+        "GS Cable Losses"
         "Receiver (G/T - k)"
         "Data Rate"
         "Required Eb/N0"
@@ -211,13 +215,17 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
     end
 
+    axis tight
+    ax = gca;
+    ax.FontSize = 16;
+    ax.LooseInset = ax.TightInset;
     plot(cumulative,'k-o','LineWidth',2)
 
     xticks(1:length(labels))
     xticklabels(labels)
     xtickangle(45)
 
-    ylabel("dB")
+    ylabel("Loss / Win Magnitude (dB)",'FontSize',18)
     title(freqBand + ": Downlink Link Budget Waterfall Diagram")
 
     margin = cumulative(end);
@@ -225,7 +233,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
     plot(length(labels), margin,'kp','MarkerSize',12,'MarkerFaceColor','yellow')
 
     text(length(labels), margin, sprintf("  Margin = %.2f dB", margin), ...
-        'FontSize',12,'VerticalAlignment','bottom')
+        'FontSize',14,'VerticalAlignment','bottom', 'Clipping', 'off')
 
     ylim([min(cumulative)-10 max(cumulative)+10])
 

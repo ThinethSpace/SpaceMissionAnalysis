@@ -213,7 +213,7 @@ end
 
 
             % Vectorized Access Calculation
-            [dist,c] = obj.haversine(grid_pts(:,1), grid_pts(:,2), ...
+            [~,c] = obj.haversine(grid_pts(:,1), grid_pts(:,2), ...
                                     sat_lat, sat_lon, R_earth);
         
             % Elevation angle
@@ -272,12 +272,6 @@ end
         
             % Update state
             data.last_access = current_access;
-
-            if t_current_seconds > seconds(30000)
-                disp(current_access)
-                i = 1;
-            end
-        
         
         end
     end
