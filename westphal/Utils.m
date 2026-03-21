@@ -161,6 +161,28 @@ classdef Utils
 
 
         end
+
+        function plot_heatmap_passes(csv)
+
+            csv_file = readmatrix(csv); 
+            data = csv_file(2:end,2:end);
+            altitudes = csv_file(2:end,1);
+            inclinations = csv_file(1,2:end);
+
+            xvalues = string(round(rad2deg(inclinations)));
+            yvalues = string(altitudes);
+            h = heatmap(xvalues,yvalues,data);
+
+
+            h.Title = 'Total Pass Duration in hours';
+            h.XLabel = 'Inclination (deg)';
+            h.YLabel = 'Altitude (km)';
+            h.Colormap = nebula;
+
+
+        end
+
+            
     
     end
 end

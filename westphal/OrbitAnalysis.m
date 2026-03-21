@@ -273,12 +273,6 @@ end
             % Update state
             data.last_access = current_access;
 
-            if t_current_seconds > seconds(30000)
-                disp(current_access)
-                i = 1;
-            end
-        
-        
         end
     end
 end
