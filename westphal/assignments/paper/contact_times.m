@@ -1,3 +1,4 @@
+tic
 %% Constants and parameters
 % Constants
 R_E = 6378; % km
@@ -12,19 +13,18 @@ nu0 = 0;
 
 % Simulation parameters
 t0 = 0;
-t1 = 60 * 60 * 4;
+t1 = 60 * 60 * 24 * 365; % 1 year in seconds
 t_step = 60;
 t_start = datetime([2026 3 1 00 00 00]);
 
 % Altiude and inclination ranges
-altitudes = linspace(200, 450, 5); % km
+altitudes = linspace(180, 400, 5); % km
 inclinations = deg2rad(linspace(0, 100, 5)); 
 
 %% Ground station grid and cloud probability
 
 gs_rf = [
   37.00   -25.14  275.00
-  50.00    5.15   386.68
  -31.05   116.19  262.94
   -31.05  116.19  252.26
  -35.78   -69.40 1550.00
@@ -55,7 +55,6 @@ optical_probability_rf =[
   1.0;
   1.0;
   1.0;
-  1.0;
   ];
 
 optical_probability_optocom =[
@@ -78,8 +77,10 @@ data = PassDuration;
 lat_grid = gs_rf(:,1); lon_grid = gs_rf(:,2);
 num_pts = length(lat_grid);
 
-cloud_probability = cloud_probability_rf;
-min_elevation = (1/180) * pi; % minimum elevation
+MIN_ELEV = 20; % deg
+
+cloud_probability = optical_probability_rf;
+min_elevation = (MIN_ELEV/180) * pi; % minimum elevation
 
 results_pass_sum = zeros(length(altitudes), length(inclinations));
 results_pass_count = zeros(length(altitudes), length(inclinations));
@@ -119,3 +120,4 @@ pass_sum_table = array2table(results_pass_sum, 'VariableNames', string(inclinati
 pass_count_table = array2table(results_pass_count, 'VariableNames', string(inclinations ), 'RowNames', string(altitudes));
 writetable(pass_sum_table, 'pass_sum_table.csv', 'WriteRowNames', true);
 writetable(pass_count_table, 'pass_count_table.csv', 'WriteRowNames', true);
+toc
