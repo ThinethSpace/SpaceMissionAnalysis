@@ -5,24 +5,7 @@
     the link budget
 %}
 
-%% SBAND: Satellite Transmitter
-sat_sband.eff_factor       = 0.8;       % percentage
-sat_sband.ant_gain_ideal   = 7;         % dBi
-sat_sband.tx_power         = 1;         % Watt
-sat_sband.loss_cables      = 0.3;       % dB
-sat_sband.frequency        = 2.2e9;     % Hz SBAND
-sat_sband.datarate         = 2e6;       % Bps    FINE TUNE THIS ONE
 
-
-%%  SBAND: Ground Station Properties
-% Take the worst performing SBAND ground station from the ESTRACK Network (Santa Maria)
-gs_sband.dish_diameter      = 5;        % m
-gs_sband.altitude           = 275;      % m
-gs_sband.gain_over_temp     = 16;       % dB / K
-gs_sband.pointing_loss      = 1;        % deg
-gs_sband.loss_cables        = 3;        % dB 
-gs_sband.min_elevation      = 10;       % Minimum allowed elevation for downlink
-gs_sband.EbByN0             = 5;        % dB QPSK Convolutional 4
 
 
 %% XBAND: Satellite Transmitter
@@ -50,5 +33,4 @@ gs_xband.EbByN0         = 5;        % dB QPSK Convolutional 4
 % Altiude and inclination ranges
 alt = linspace(180, 400, 5) * 1000; % km
 
-
-linkBudget(sat_xband, gs_xband, alt);
+RflinkBudget(sat_xband, gs_xband, alt);

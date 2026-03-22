@@ -1,5 +1,34 @@
-function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
+function [] = RflinkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
+        function dist = slantRange(elevationAngles, orbitalHeight_m, gs_altitude_m, Re)
+        % Calculates the distance between a GS and a satellite
+        %
+        % Inputs:
+        %   elevationAngles - Array of elevation angles in degrees
+        %   orbitalHeight_m - Satellite altitude above sea level (meters)
+        %   gs_altitude_m  - Ground station altitude above sea level (meters)
+        %   Re              - Radius of the  planet (meters)
+        
+        % Radius from Earth center to Ground Station
+        rs = Re + gs_altitude_m;
+        
+        % Radius from Earth center to Satellite
+        rt = Re + orbitalHeight_m;
+        
+        % Pre-allocate output array
+        dist = zeros(size(elevationAngles));
+        
+        % Loop through angles (or vectorize)
+        % Using the geometric formula: 
+        % d = sqrt(rs^2 * sin(el)^2 + rt^2 - rs^2) - rs * sin(el)
+        
+        for j = 1:length(elevationAngles)
+            el_rad = deg2rad(elevationAngles(j));
+            
+            % Calculation derived from the Law of Cosines
+            dist(j) = sqrt(rt^2 - (rs * cos(el_rad)).^2) - rs * sin(el_rad);
+        end
+    end
     %% Satellite Properties
     sat_eff_factor              = sat_struct.eff_factor;
     sat_ideal_antenna_gain_db   = sat_struct.ant_gain_ideal;
@@ -81,9 +110,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
         margins_downlink = zeros(1,length(angles));
 
         for i = 1:length(angles)
- 
-            dist = slantRangeCircularOrbit(angles(i), orbitalHeight_m, gs_altitude_m);
-
+            dist = slantRange(angles(i), orbitalHeight_m, gs_altitude_m, 6371e3);
             % FSPL
             FSPL    = (lambda/(4*pi*dist))^2;
             FSPL_db =  -10*log10(FSPL); %  Value is negative, adding a minus will make it a positive loss
@@ -154,7 +181,7 @@ function [] = linkBudget(sat_struct, gs_struct, orbitalHeight_m_arr)
 
 
     %% --------------------------------------------------
-    %% PROFESSIONAL WATERFALL LINK BUDGET DIAGRAM
+    %%        LINK BUDGET DIAGRAM
     %% (G/T - k grouped to avoid Boltzmann confusion)
     %% --------------------------------------------------
 
