@@ -214,7 +214,7 @@ end
 
 
             % Vectorized Access Calculation
-            [~,c] = obj.haversine(grid_pts(:,1), grid_pts(:,2), ...
+            [dist,c] = obj.haversine(grid_pts(:,1), grid_pts(:,2), ...
                                     sat_lat, sat_lon, R_earth);
         
             % Elevation angle
