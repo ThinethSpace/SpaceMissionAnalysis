@@ -18,7 +18,7 @@ data = PassDuration;
 % Calculate inclination for SSO orbit
 % https://en.wikipedia.org/wiki/Sun-synchronous_orbit
 %i = acos(-(a / 12352)^(7/3));
-i = pi/4;
+i = 0;
 
 % Calculate orbital period
 T = 2 * pi * sqrt(a^3 / mu);
@@ -29,7 +29,7 @@ t1 = 4.3   * T;
 t_step = 60;
 t_start = datetime([2010 1 17 10 20 36]);
 
-min_elevation = (30/180) * pi; % minimum elevation
+min_elevation = (20/180) * pi; % minimum elevation
 
 % Create grid
 gs_rf = [
