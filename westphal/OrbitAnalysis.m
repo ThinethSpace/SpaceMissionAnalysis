@@ -196,6 +196,7 @@ end
             % lat_grid [mxn] latitude grid points [deg]
             % lon_grid [mxn] longitude grid points [deg]
             % R_earth [1x1] Earth radius [km]
+            % optical_availability [nx1] optical availability at each grid point
             % data [PassDuration] Handle class for storing intermediate results
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
