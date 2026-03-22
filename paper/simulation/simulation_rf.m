@@ -13,7 +13,7 @@ nu0 = 0;
 
 % Simulation parameters
 t0 = 0;
-t1 = 60 * 60 * 24 * 7; % 1 year in seconds
+t1 = 60 * 60 * 24 * 365; % 1 year in seconds
 t_step = 60;
 t_start = datetime([2026 3 1 00 00 00]);
 
